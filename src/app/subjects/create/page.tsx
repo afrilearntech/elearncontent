@@ -1,0 +1,265 @@
+"use client";
+
+import Link from "next/link";
+import React from "react";
+import { useRouter } from "next/navigation";
+
+function Stepper({ active }: { active: 1 | 2 }) {
+  const steps = [
+    { id: 1, label: "Subject Details" },
+    { id: 2, label: "Publish" },
+  ];
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+      <ol className="flex w-full items-center justify-between">
+        {steps.map((s, idx) => (
+          <li key={s.id} className="flex items-center gap-2 sm:gap-3">
+            <span className={`flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full text-xs sm:text-sm font-semibold ${idx + 1 <= active ? "bg-emerald-600 text-white" : "bg-gray-200 text-gray-600"}`}>{s.id}</span>
+            <span className={`text-xs sm:text-sm ${idx + 1 === active ? "text-gray-900 font-medium" : "text-gray-500"}`}>{s.label}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+export default function CreateSubjectPage() {
+  const router = useRouter();
+  const [step, setStep] = React.useState<1 | 2>(1);
+  const [name, setName] = React.useState("");
+  const [grade, setGrade] = React.useState("Select grade");
+  const [category, setCategory] = React.useState("Select Category");
+  const [tags, setTags] = React.useState("");
+  const [description, setDescription] = React.useState("");
+  const [objectives, setObjectives] = React.useState("");
+  const [activeStatus, setActiveStatus] = React.useState(true);
+  const [coverPreview, setCoverPreview] = React.useState<string | null>(null);
+  const [coverName, setCoverName] = React.useState<string>("");
+  const [coverError, setCoverError] = React.useState<string>("");
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [showModal, setShowModal] = React.useState(false);
+
+  function onChooseFileClick() {
+    fileInputRef.current?.click();
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverError("");
+    if (file.size > 10 * 1024 * 1024) {
+      setCoverError("File too large (max 10MB)");
+      setCoverPreview(null);
+      setCoverName("");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setCoverPreview(url);
+    setCoverName(file.name);
+  }
+
+  function onRemoveFile() {
+    if (coverPreview) {
+      URL.revokeObjectURL(coverPreview);
+    }
+    setCoverPreview(null);
+    setCoverName("");
+    setCoverError("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Create New Subject</h1>
+          <p className="text-sm text-gray-500">{step === 1 ? "Fill in the details to create a subject" : "Preview and review all details before publishing"}</p>
+        </div>
+        <div className="hidden gap-3 sm:flex">
+          <button className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Save Draft</button>
+          {step === 1 ? (
+            <button onClick={() => setStep(2)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
+          ) : (
+            <button onClick={() => setShowModal(true)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Publish</button>
+          )}
+        </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-4xl space-y-6">
+        <Stepper active={step} />
+
+        {step === 1 ? (
+        /* Form */
+        <form className="space-y-6">
+        {/* Subject Name */}
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <label className="mb-2 block text-sm font-medium text-gray-800">Subject Name</label>
+          <input value={name} onChange={(e)=>setName(e.target.value)} type="text" placeholder="eg. Maths" className="h-11 w-full max-w-3xl rounded-lg border border-gray-300 px-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"/>
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start max-w-3xl">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-800">Grade level</label>
+              <select value={grade} onChange={(e)=>setGrade(e.target.value)} className="h-11 w-full rounded-lg border border-gray-300 px-3 text-gray-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500">
+                <option>Select grade</option>
+                {Array.from({length:12}).map((_,i)=>(<option key={i+1}>{`Grade ${i+1}`}</option>))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-800">Subject Category</label>
+              <select value={category} onChange={(e)=>setCategory(e.target.value)} className="h-11 w-full rounded-lg border border-gray-300 px-3 text-gray-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500">
+                <option>Select Category</option>
+                <option>Mathematics</option>
+                <option>English</option>
+                <option>Science</option>
+              </select>
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-800">Tags</label>
+              <span className="text-xs text-gray-500">(optional)</span>
+            </div>
+            <input value={tags} onChange={(e)=>setTags(e.target.value)} type="text" placeholder="eg. Introduction to Algebra" className="mt-2 h-11 w-full max-w-3xl rounded-lg border border-gray-300 px-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"/>
+          </div>
+        </section>
+
+        {/* Description */}
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <label className="mb-2 block text-sm font-medium text-gray-800">Subject Description</label>
+          <textarea value={description} onChange={(e)=>setDescription(e.target.value)} rows={6} placeholder="Write a detailed description for the subject" className="w-full max-w-3xl resize-y rounded-lg border border-gray-300 p-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"/>
+        </section>
+
+        {/* Objectives */}
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-800">learning Objectives</label>
+            <span className="text-xs text-gray-500">(Optional)</span>
+          </div>
+          <textarea value={objectives} onChange={(e)=>setObjectives(e.target.value)} rows={5} placeholder="List the key learning Objectives for this subject" className="mt-2 w-full max-w-3xl resize-y rounded-lg border border-gray-300 p-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"/>
+        </section>
+
+        {/* Status */}
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <label className="mb-2 block text-sm font-medium text-gray-800">Status</label>
+          <div className="flex max-w-3xl items-center justify-between rounded-lg px-3 py-2">
+            <p className="text-sm text-gray-600">Active Subjects are visible to validator; draft are hidden</p>
+            <label className="inline-flex cursor-pointer items-center">
+              <input type="checkbox" className="peer sr-only" checked={activeStatus} onChange={(e)=>setActiveStatus(e.target.checked)} />
+              <span className="h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-emerald-500"></span>
+              <span className="-ml-8 h-5 w-5 translate-x-0 rounded-full bg-white transition peer-checked:translate-x-5"></span>
+            </label>
+          </div>
+        </section>
+
+        {/* Cover Image */}
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <label className="mb-2 block text-sm font-medium text-gray-800">Cover Image (subject thumbnail)</label>
+          <div className="max-w-3xl rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50 p-6 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 16l-4-4-4 4"/><path d="M12 12V3"/><path d="M20 21H4"/></svg>
+            </div>
+            <p className="text-sm text-gray-600">Please select or drag and drop PNG, JPG, GIF</p>
+            <p className="text-xs text-gray-500">UP TO 10MB</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif"
+              className="hidden"
+              onChange={onFileChange}
+            />
+            <button type="button" onClick={onChooseFileClick} className="mt-4 rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Choose File</button>
+            {coverName ? (
+              <div className="mt-4 flex items-center justify-center">
+                <div className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span className="max-w-[280px] truncate">{coverName}</span>
+                  <button type="button" aria-label="Remove file" onClick={onRemoveFile} className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {coverError ? (
+              <div className="mt-2 text-sm text-red-600">{coverError}</div>
+            ) : null}
+            {coverPreview ? (
+              <div className="mt-4">
+                {/* preview image */}
+                <img src={coverPreview} alt="Cover preview" className="mx-auto h-40 w-auto rounded-md object-contain" />
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        {/* Mobile Actions */}
+        <div className="flex gap-3 sm:hidden">
+          <button className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Save Draft</button>
+          {step === 1 ? (
+            <button onClick={() => setStep(2)} className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
+          ) : (
+            <button onClick={() => setShowModal(true)} className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Publish</button>
+          )}
+        </div>
+
+        {/* Back link */}
+        <div>
+          <Link href="/subjects" className="text-sm text-emerald-700 hover:underline">Back to Subjects</Link>
+        </div>
+        </form>
+        ) : (
+          <section className="space-y-4">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4 text-xs sm:text-sm text-emerald-700">
+              This is how your subject will appear to students. Review all details before publishing
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              {coverPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={coverPreview} alt="cover" className="mx-auto h-48 sm:h-64 w-full max-w-3xl rounded-lg object-cover" />
+              ) : null}
+              <h2 className="mt-4 text-xl sm:text-2xl font-semibold text-gray-900">{name || "Untitled Subject"}</h2>
+              <div className="mt-2 flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-gray-700">
+                {grade !== "Select grade" ? <span>Grade {grade.replace("Grade ", "")}</span> : null}
+                {category !== "Select Category" ? <span>{category}</span> : null}
+                <span className={`rounded-full px-2 py-0.5 text-xs ${activeStatus ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"}`}>{activeStatus ? "Active" : "Draft"}</span>
+              </div>
+              {description ? (
+                <div className="mt-6">
+                  <h3 className="text-base font-semibold text-gray-900">Subject Description</h3>
+                  <p className="mt-2 text-sm leading-6 text-gray-700 whitespace-pre-wrap">{description}</p>
+                </div>
+              ) : null}
+              {objectives ? (
+                <div className="mt-6">
+                  <h3 className="text-base font-semibold text-gray-900">Learning Objectives</h3>
+                  <p className="mt-2 text-sm leading-6 text-gray-700 whitespace-pre-wrap">{objectives}</p>
+                </div>
+              ) : null}
+            </div>
+            <div className="flex justify-between">
+              <button onClick={() => setStep(1)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
+              <button onClick={() => setShowModal(true)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Publish</button>
+            </div>
+          </section>
+        )}
+      </div>
+
+      {showModal ? (
+        <div className="fixed inset-0 z-100 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowModal(false)} />
+          <div role="dialog" aria-modal="true" className="relative z-101 w-[90%] max-w-sm rounded-xl bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h3 className="text-base font-semibold text-gray-900">Submitted Successfully</h3>
+            <p className="mt-2 text-sm text-gray-600">Your subject has been submitted and will be reviewed for validation before it can be published. You'll receive a notification once the review is complete.</p>
+            <button onClick={() => router.push('/subjects')} className="mt-5 inline-flex items-center justify-center rounded-full bg-emerald-600 px-6 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Okay</button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+
