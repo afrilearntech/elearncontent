@@ -7,6 +7,7 @@ import Link from "next/link";
 export default function LearningMaterialCreatePage() {
   const router = useRouter();
   const [fileName, setFileName] = React.useState("");
+  const [fileUrl, setFileUrl] = React.useState<string | null>(null);
   const [fileError, setFileError] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const [lessonType, setLessonType] = React.useState<string>("");
@@ -31,7 +32,17 @@ export default function LearningMaterialCreatePage() {
       setFileName("");
       return;
     }
+    if (fileUrl) URL.revokeObjectURL(fileUrl);
     setFileName(file.name);
+    setFileUrl(URL.createObjectURL(file));
+  }
+
+  function removeFile() {
+    if (fileUrl) URL.revokeObjectURL(fileUrl);
+    setFileUrl(null);
+    setFileName("");
+    setFileError("");
+    if (inputRef.current) inputRef.current.value = "";
   }
 
   return (
@@ -105,6 +116,40 @@ export default function LearningMaterialCreatePage() {
             {fileName ? <div className="mt-3 text-sm text-gray-700">Selected: {fileName}</div> : null}
             {fileError ? <div className="mt-2 text-sm text-red-600">{fileError}</div> : null}
           </div>
+
+          {/* Preview */}
+          {fileUrl ? (
+            <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-medium text-gray-900">File Preview</div>
+                <button type="button" onClick={removeFile} className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  Remove
+                </button>
+              </div>
+              {lessonType === "video" ? (
+                <video src={fileUrl} controls className="mx-auto h-56 w-full max-w-3xl rounded-lg bg-black" />
+              ) : (
+                <div className="rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50 p-6 text-center">
+                  <div className="mx-auto my-6 flex h-40 w-full max-w-3xl items-center justify-center rounded-lg bg-white text-gray-600">
+                    <div>
+                      <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                      </div>
+                      <div className="text-sm">Document Preview</div>
+                      <div className="text-xs text-gray-500">{fileName}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
+                    <button className="rounded-md border border-gray-300 px-3 py-1">&lt;</button>
+                    <span>1</span>
+                    <span>of 15</span>
+                    <button className="rounded-md border border-gray-300 px-3 py-1">&gt;</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
         </section>
 
         {/* Mobile actions */}
