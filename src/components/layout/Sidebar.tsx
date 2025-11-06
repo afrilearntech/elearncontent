@@ -27,9 +27,11 @@ function isActivePath(pathname: string, href: string) {
 type SidebarProps = {
   mobileOpen?: boolean;
   onClose?: () => void;
+  userName?: string;
+  userRole?: string;
 };
 
-export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
+export default function Sidebar({ mobileOpen = false, onClose, userName = "Bertha Jones", userRole = "Content Creator" }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -62,12 +64,20 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           })}
         </ul>
 
-          <div className="mt-auto p-3">
+          <div className="mt-auto p-3 space-y-3">
+            {/* User Info Card */}
+            <div className="rounded-lg bg-white border border-gray-200 shadow-sm p-4">
+              <div className="font-semibold text-gray-900 text-sm mb-2">{userName}</div>
+              <div className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                {userRole}
+              </div>
+            </div>
+            {/* Logout Button */}
             <button className="flex items-center justify-center gap-2 rounded-full bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 w-[220px] h-[50px] mx-auto">
-            <Image src="/img/icons/logout.png" alt="" width={16} height={16} />
-            Logout
-          </button>
-        </div>
+              <Image src="/img/icons/logout.png" alt="" width={16} height={16} />
+              Logout
+            </button>
+          </div>
       </nav>
     </aside>
       {/* Mobile sidebar drawer */}
@@ -101,7 +111,15 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
                   );
                 })}
               </ul>
-              <div className="mt-auto p-3">
+              <div className="mt-auto p-3 space-y-3">
+                {/* User Info Card */}
+                <div className="rounded-lg bg-white border border-gray-200 shadow-sm p-4">
+                  <div className="font-semibold text-gray-900 text-sm mb-2">{userName}</div>
+                  <div className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                    {userRole}
+                  </div>
+                </div>
+                {/* Logout Button */}
                 <button className="flex items-center justify-center gap-2 rounded-full bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 w-[220px] h-[50px] mx-auto" onClick={onClose}>
                   <Image src="/img/icons/logout.png" alt="" width={16} height={16} />
                   Logout
