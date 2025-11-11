@@ -4,10 +4,18 @@ import Link from "next/link";
 import React from "react";
 import { useRouter } from "next/navigation";
 
-function Stepper({ active }: { active: 1 | 2 }) {
+type Topic = {
+  id: string;
+  title: string;
+  description?: string;
+  expanded?: boolean;
+};
+
+function Stepper({ active }: { active: 1 | 2 | 3 }) {
   const steps = [
     { id: 1, label: "Subject Details" },
-    { id: 2, label: "Publish" },
+    { id: 2, label: "Topics" },
+    { id: 3, label: "Publish" },
   ];
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
@@ -25,7 +33,7 @@ function Stepper({ active }: { active: 1 | 2 }) {
 
 export default function CreateSubjectPage() {
   const router = useRouter();
-  const [step, setStep] = React.useState<1 | 2>(1);
+  const [step, setStep] = React.useState<1 | 2 | 3>(1);
   const [name, setName] = React.useState("");
   const [grade, setGrade] = React.useState("Select grade");
   const [category, setCategory] = React.useState("Select Category");
@@ -38,6 +46,12 @@ export default function CreateSubjectPage() {
   const [coverError, setCoverError] = React.useState<string>("");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [showModal, setShowModal] = React.useState(false);
+
+  // Topics state
+  const [topics, setTopics] = React.useState<Topic[]>([]);
+  const [showTopicModal, setShowTopicModal] = React.useState(false);
+  const [topicTitle, setTopicTitle] = React.useState("");
+  const [topicDesc, setTopicDesc] = React.useState("");
 
   function onChooseFileClick() {
     fileInputRef.current?.click();
@@ -70,19 +84,46 @@ export default function CreateSubjectPage() {
     }
   }
 
+  function addTopic() {
+    if (!topicTitle.trim()) return;
+    const id = Date.now().toString();
+    setTopics((prev) => [...prev, { id, title: topicTitle.trim(), description: topicDesc.trim(), expanded: false }]);
+    setShowTopicModal(false);
+    setTopicTitle("");
+    setTopicDesc("");
+  }
+
+  function toggleTopic(id: string) {
+    setTopics((prev) => prev.map((t) => (t.id === id ? { ...t, expanded: !t.expanded } : t)));
+  }
+
+  function removeTopic(id: string) {
+    setTopics((prev) => prev.filter((t) => t.id !== id));
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Create New Subject</h1>
-          <p className="text-sm text-gray-500">{step === 1 ? "Fill in the details to create a subject" : "Preview and review all details before publishing"}</p>
+          <p className="text-sm text-gray-500">
+            {step === 1
+              ? "Fill in the details to create a subject"
+              : step === 2
+              ? "Add and organize the topics for the subject"
+              : "Preview and review all details before publishing"}
+          </p>
         </div>
         <div className="hidden gap-3 sm:flex">
           <button className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Save Draft</button>
-          {step === 1 ? (
+          {step === 1 && (
             <button onClick={() => setStep(2)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
-          ) : (
+          )}
+          {step === 2 && (
+            <button onClick={() => setStep(3)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
+          )}
+          {step === 3 && (
             <button onClick={() => setShowModal(true)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Publish</button>
           )}
         </div>
@@ -198,9 +239,7 @@ export default function CreateSubjectPage() {
           <button className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Save Draft</button>
           {step === 1 ? (
             <button onClick={() => setStep(2)} className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
-          ) : (
-            <button onClick={() => setShowModal(true)} className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Publish</button>
-          )}
+          ) : null}
         </div>
 
         {/* Back link */}
@@ -208,6 +247,42 @@ export default function CreateSubjectPage() {
           <Link href="/subjects" className="text-sm text-emerald-700 hover:underline">Back to Subjects</Link>
         </div>
         </form>
+        ) : step === 2 ? (
+          <section className="space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <h3 className="mb-3 text-base font-semibold text-gray-900">Added Subject</h3>
+              <div className="space-y-3">
+                {topics.length === 0 ? (
+                  <div className="text-sm text-gray-600">No topics added yet.</div>
+                ) : (
+                  topics.map((t) => (
+                    <div key={t.id} className="rounded-lg border border-gray-200">
+                      <button type="button" onClick={() => toggleTopic(t.id)} className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-3 w-3 items-center justify-center rounded-full bg-emerald-600"></span>
+                          <span className="text-sm text-gray-800">{t.title}</span>
+                        </div>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                          {t.expanded ? (<polyline points="18 15 12 9 6 15" />) : (<polyline points="6 9 12 15 18 9" />)}
+                        </svg>
+                      </button>
+                      {t.expanded && t.description ? (
+                        <div className="px-4 pb-4 text-sm text-gray-600">{t.description}</div>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+              <button onClick={() => setShowTopicModal(true)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 px-4 py-6 text-emerald-700 hover:bg-emerald-100">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                <span className="font-medium">Add New Topic</span>
+              </button>
+            </div>
+            <div className="flex justify-between">
+              <button onClick={() => setStep(1)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
+              <button onClick={() => setStep(3)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
+            </div>
+          </section>
         ) : (
           <section className="space-y-4">
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4 text-xs sm:text-sm text-emerald-700">
@@ -236,9 +311,33 @@ export default function CreateSubjectPage() {
                   <p className="mt-2 text-sm leading-6 text-gray-700 whitespace-pre-wrap">{objectives}</p>
                 </div>
               ) : null}
+
+              {topics.length > 0 ? (
+                <div className="mt-6">
+                  <h3 className="text-base font-semibold text-gray-900">Topics</h3>
+                  <div className="mt-3 space-y-3">
+                    {topics.map((t) => (
+                      <div key={t.id} className="rounded-lg border border-gray-200">
+                        <button type="button" onClick={() => toggleTopic(t.id)} className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex h-3 w-3 items-center justify-center rounded-full bg-emerald-600"></span>
+                            <span className="text-sm text-gray-800">{t.title}</span>
+                          </div>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                            {t.expanded ? (<polyline points="18 15 12 9 6 15" />) : (<polyline points="6 9 12 15 18 9" />)}
+                          </svg>
+                        </button>
+                        {t.expanded && t.description ? (
+                          <div className="px-4 pb-4 text-sm text-gray-600">{t.description}</div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
             <div className="flex justify-between">
-              <button onClick={() => setStep(1)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
+              <button onClick={() => setStep(2)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
               <button onClick={() => setShowModal(true)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Publish</button>
             </div>
           </section>
@@ -255,6 +354,33 @@ export default function CreateSubjectPage() {
             <h3 className="text-base font-semibold text-gray-900">Submitted Successfully</h3>
             <p className="mt-2 text-sm text-gray-600">Your subject has been submitted and will be reviewed for validation before it can be published. You'll receive a notification once the review is complete.</p>
             <button onClick={() => router.push('/subjects')} className="mt-5 inline-flex items-center justify-center rounded-full bg-emerald-600 px-6 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Okay</button>
+          </div>
+        </div>
+      ) : null}
+
+      {showTopicModal ? (
+        <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowTopicModal(false)} />
+          <div className="relative z-101 w-full max-w-xl rounded-xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-gray-900">Add Topic</h2>
+              <button aria-label="Close" onClick={() => setShowTopicModal(false)} className="rounded-full p-1 text-gray-500 hover:bg-gray-100">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-800">Add Topic</label>
+                <input value={topicTitle} onChange={(e)=>setTopicTitle(e.target.value)} placeholder="Introduction to Algebra" className="h-11 w-full rounded-lg border border-gray-300 px-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500" />
+              </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-800">Topic Description</label>
+                </div>
+                <textarea value={topicDesc} onChange={(e)=>setTopicDesc(e.target.value)} rows={6} placeholder="Learn how letters and numbers work together to solve simple math problems." className="w-full resize-y rounded-lg border border-gray-300 p-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500" />
+              </div>
+              <button onClick={addTopic} className="mt-2 w-full rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">Submit</button>
+            </div>
           </div>
         </div>
       ) : null}
