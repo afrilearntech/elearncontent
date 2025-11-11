@@ -17,18 +17,60 @@ const rows: LessonRow[] = [
   { title: "The Solar System", type: "Learning Material", subject: "Maths", grade: "Grade 7", status: "DRAFT" },
   { title: "The Solar System", type: "Quiz Assessment", subject: "Maths", grade: "Grade 7", status: "DRAFT" },
   { title: "The Solar System", type: "Quiz Assessment", subject: "Maths", grade: "Grade 7", status: "DRAFT" },
+  { title: "Gravity Basics", type: "Learning Material", subject: "Maths", grade: "Grade 6", status: "PUBLISHED" },
+  { title: "Comprehension Set A", type: "Quiz Assessment", subject: "English", grade: "Grade 6", status: "PUBLISHED" },
+  { title: "Fractions 101", type: "Learning Material", subject: "Maths", grade: "Grade 5", status: "DRAFT" },
+  { title: "Algebraic Expressions", type: "Quiz Assessment", subject: "Maths", grade: "Grade 8", status: "PUBLISHED" },
+  { title: "Reading Practice", type: "Learning Material", subject: "English", grade: "Grade 7", status: "PUBLISHED" },
 ];
 
 export default function LessonsPage() {
   const [editIndex, setEditIndex] = React.useState<number | null>(null);
   const [deleteIndex, setDeleteIndex] = React.useState<number | null>(null);
+  const [search, setSearch] = React.useState("");
+  const [subject, setSubject] = React.useState("All");
+  const [grade, setGrade] = React.useState("All");
+  const [status, setStatus] = React.useState("All");
+  const [page, setPage] = React.useState(1);
+  const pageSize = 5;
+
+  const filtered = React.useMemo(() => {
+    return rows.filter((r) => {
+      const matchesSearch = search.trim().length === 0 || r.title.toLowerCase().includes(search.toLowerCase());
+      const matchesSubject = subject === "All" || r.subject === subject;
+      const matchesGrade = grade === "All" || r.grade === grade;
+      const matchesStatus = status === "All" || r.status === (status === "Draft" ? "DRAFT" : "PUBLISHED");
+      return matchesSearch && matchesSubject && matchesGrade && matchesStatus;
+    });
+  }, [search, subject, grade, status]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * pageSize;
+  const paged = filtered.slice(start, start + pageSize);
+
+  React.useEffect(() => {
+    // Reset to first page when filters change
+    setPage(1);
+  }, [search, subject, grade, status]);
+
   const isEditing = editIndex !== null;
   const isDeleting = deleteIndex !== null;
-  const row = editIndex !== null ? rows[editIndex] : null;
-  const deleteRow = deleteIndex !== null ? rows[deleteIndex] : null;
+  const row = editIndex !== null ? paged[editIndex] : null;
+  const deleteRow = deleteIndex !== null ? paged[deleteIndex] : null;
+
   return (
     <div className="space-y-6">
-      <LessonsHeader />
+      <LessonsHeader
+        search={search}
+        subject={subject}
+        grade={grade}
+        status={status}
+        onSearch={setSearch}
+        onSubjectChange={setSubject}
+        onGradeChange={setGrade}
+        onStatusChange={setStatus}
+      />
 
       {/* Mobile Create Button */}
       <div className="md:hidden">
@@ -48,81 +90,111 @@ export default function LessonsPage() {
           <div className="col-span-1">Status</div>
           <div className="col-span-1 text-right">Actions</div>
         </div>
-        <div className="divide-y divide-gray-100">
-          {rows.map((r, idx) => (
-            <div key={idx} className="grid grid-cols-12 items-center px-4 py-4 text-sm">
-              <div className="col-span-5 text-gray-900">{r.title}</div>
-              <div className="col-span-2">
-                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${r.type === "Learning Material" ? "bg-emerald-50 text-emerald-700" : "bg-indigo-50 text-indigo-700"}`}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                  {r.type}
-                </span>
+        {paged.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sm text-gray-600">No lessons match your filters.</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {paged.map((r, idx) => (
+              <div key={`${r.title}-${idx}`} className="grid grid-cols-12 items-center px-4 py-4 text-sm">
+                <div className="col-span-5 text-gray-900">{r.title}</div>
+                <div className="col-span-2">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${r.type === "Learning Material" ? "bg-emerald-50 text-emerald-700" : "bg-indigo-50 text-indigo-700"}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    {r.type}
+                  </span>
+                </div>
+                <div className="col-span-2 text-gray-700">{r.subject}</div>
+                <div className="col-span-1 text-gray-700">{r.grade}</div>
+                <div className="col-span-1">
+                  <span className={`rounded-full px-2 py-1 text-xs font-medium ${r.status === "PUBLISHED" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-600"}`}>{r.status}</span>
+                </div>
+                <div className="col-span-1 flex items-center justify-end gap-3 text-gray-500">
+                  <button aria-label="View" className="hover:text-gray-700"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                  <button aria-label="Edit" onClick={() => setEditIndex(idx)} className="hover:text-gray-700"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                  <button aria-label="Delete" onClick={() => setDeleteIndex(idx)} className="hover:text-rose-600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg></button>
+                </div>
               </div>
-              <div className="col-span-2 text-gray-700">{r.subject}</div>
-              <div className="col-span-1 text-gray-700">{r.grade}</div>
-              <div className="col-span-1">
-                <span className="rounded-full bg-rose-50 px-2 py-1 text-xs font-medium text-rose-600">{r.status}</span>
-              </div>
-              <div className="col-span-1 flex items-center justify-end gap-3 text-gray-500">
-                <button aria-label="View" className="hover:text-gray-700"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg></button>
-                <button aria-label="Edit" onClick={() => setEditIndex(idx)} className="hover:text-gray-700"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
-                <button aria-label="Delete" onClick={() => setDeleteIndex(idx)} className="hover:text-rose-600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg></button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Mobile Card View */}
       <div className="md:hidden space-y-4">
-        {rows.map((r, idx) => (
-          <div key={idx} className="rounded-xl border border-gray-200 bg-white p-4">
-            <div className="flex items-start justify-between mb-3">
-              <h3 className="text-base font-semibold text-gray-900">{r.title}</h3>
-              <div className="flex items-center gap-2 text-gray-500">
-                <button aria-label="View" className="hover:text-gray-700"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg></button>
-                <button aria-label="Edit" onClick={() => setEditIndex(idx)} className="hover:text-gray-700"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
-                <button aria-label="Delete" onClick={() => setDeleteIndex(idx)} className="hover:text-rose-600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg></button>
+        {paged.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600">No lessons match your filters.</div>
+        ) : (
+          paged.map((r, idx) => (
+            <div key={`${r.title}-m-${idx}`} className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="flex items-start justify-between mb-3">
+                <h3 className="text-base font-semibold text-gray-900">{r.title}</h3>
+                <div className="flex items-center gap-2 text-gray-500">
+                  <button aria-label="View" className="hover:text-gray-700"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                  <button aria-label="Edit" onClick={() => setEditIndex(idx)} className="hover:text-gray-700"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                  <button aria-label="Delete" onClick={() => setDeleteIndex(idx)} className="hover:text-rose-600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg></button>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">Type:</span>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${r.type === "Learning Material" ? "bg-emerald-50 text-emerald-700" : "bg-indigo-50 text-indigo-700"}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    {r.type}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">Subject:</span>
+                  <span className="text-gray-700">{r.subject}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">Grade:</span>
+                  <span className="text-gray-700">{r.grade}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">Status:</span>
+                  <span className={`rounded-full px-2 py-1 text-xs font-medium ${r.status === "PUBLISHED" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-600"}`}>{r.status}</span>
+                </div>
               </div>
             </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500">Type:</span>
-                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${r.type === "Learning Material" ? "bg-emerald-50 text-emerald-700" : "bg-indigo-50 text-indigo-700"}`}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                  {r.type}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500">Subject:</span>
-                <span className="text-gray-700">{r.subject}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500">Grade:</span>
-                <span className="text-gray-700">{r.grade}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500">Status:</span>
-                <span className="rounded-full bg-rose-50 px-2 py-1 text-xs font-medium text-rose-600">{r.status}</span>
-              </div>
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* Pagination */}
       <div className="flex items-center justify-center gap-2">
-        <button className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">&lt;</button>
-        {[1,2,3,4,5,9,10].map((n, i)=> (
-          <button key={i} className={`rounded-md border px-3 py-1.5 text-sm ${n===3? 'border-emerald-600 bg-emerald-600 text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>{n}</button>
-        ))}
-        <button className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">&gt;</button>
+        <button
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={currentPage === 1}
+          className={`rounded-md border px-3 py-1.5 text-sm ${currentPage === 1 ? "border-gray-200 text-gray-300" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+        >
+          &lt;
+        </button>
+        {Array.from({ length: totalPages }).map((_, i) => {
+          const n = i + 1;
+          const active = n === currentPage;
+          return (
+            <button
+              key={n}
+              onClick={() => setPage(n)}
+              className={`rounded-md border px-3 py-1.5 text-sm ${active ? "border-emerald-600 bg-emerald-600 text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+            >
+              {n}
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          disabled={currentPage === totalPages}
+          className={`rounded-md border px-3 py-1.5 text-sm ${currentPage === totalPages ? "border-gray-200 text-gray-300" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+        >
+          &gt;
+        </button>
       </div>
 
       {isEditing ? (
         <div className="fixed inset-0 z-100 flex items-start justify-center pt-10">
           <div className="absolute inset-0 bg-black/50" onClick={() => setEditIndex(null)} />
-          <div className="relative z-101 w-[92%] max-w-2xl rounded-xl bg-white p-5 shadow-2xl">
+          <div className="relative z-101 w-[92%] max-w-2xl rounded-xl bg-white p-5 shadow-2xl max-h-[80vh] overflow-y-auto">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-900">Edit Lesson Details</h2>
               <button aria-label="Close" onClick={() => setEditIndex(null)} className="rounded-full p-1 text-gray-500 hover:bg-gray-100">
@@ -188,7 +260,7 @@ export default function LessonsPage() {
               </button>
               <button
                 onClick={() => {
-                  // Handle delete action here
+                  // In a real app, remove from data source; here we just close
                   setDeleteIndex(null);
                 }}
                 className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
