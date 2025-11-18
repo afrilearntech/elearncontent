@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { usePathname } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import Sidebar from "@/components/layout/Sidebar";
 
@@ -12,6 +13,13 @@ type AppShellProps = {
 
 export default function AppShell({ children, userName, userRole }: AppShellProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
+  const pathname = usePathname();
+  const isAuthPage = pathname?.startsWith("/sign-in");
+
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+
   return (
     <>
       <Navbar onMenuClick={() => setMobileSidebarOpen(true)} />
@@ -22,5 +30,3 @@ export default function AppShell({ children, userName, userRole }: AppShellProps
     </>
   );
 }
-
-
