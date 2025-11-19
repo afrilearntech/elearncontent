@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import React from "react";
@@ -16,7 +17,7 @@ type Question = {
   answer?: boolean;
 };
 
-export default function QuizQuestionsPage() {
+function QuizQuestionsContent() {
   const params = useSearchParams();
   const quizTitle = params.get("title") || "Introduction to Algebra";
   const [showAddModal, setShowAddModal] = React.useState(false);
@@ -987,6 +988,28 @@ export default function QuizQuestionsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function QuizQuestionsPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Quiz Details Page</h1>
+            <p className="text-sm text-gray-500">Loading...</p>
+          </div>
+        </div>
+        <div className="mx-auto w-full max-w-4xl space-y-6">
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="text-sm text-gray-600">Loading questions...</div>
+          </div>
+        </div>
+      </div>
+    }>
+      <QuizQuestionsContent />
+    </Suspense>
   );
 }
 

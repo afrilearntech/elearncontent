@@ -1,9 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 
-export default function LessonPreviewPage() {
+function LessonPreviewContent() {
   const params = useSearchParams();
   const router = useRouter();
   const type = (params.get("type") || "pdf").toLowerCase();
@@ -92,6 +93,29 @@ export default function LessonPreviewPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function LessonPreviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Lesson Details Page</h1>
+            <p className="text-sm text-gray-500">Fill in the details to create a subject</p>
+          </div>
+          <Link href="/lessons" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Back to lessons</Link>
+        </div>
+        <div className="mx-auto w-full max-w-4xl space-y-6">
+          <div className="rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50 p-6 text-center">
+            <div className="text-sm text-gray-600">Loading preview...</div>
+          </div>
+        </div>
+      </div>
+    }>
+      <LessonPreviewContent />
+    </Suspense>
   );
 }
 
