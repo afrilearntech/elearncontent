@@ -3,6 +3,8 @@
 import Link from "next/link";
 import React from "react";
 import { useRouter } from "next/navigation";
+import { createSubject } from "@/lib/api/subjects";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 type Topic = {
   id: string;
@@ -36,8 +38,6 @@ export default function CreateSubjectPage() {
   const [step, setStep] = React.useState<1 | 2 | 3>(1);
   const [name, setName] = React.useState("");
   const [grade, setGrade] = React.useState("Select grade");
-  const [category, setCategory] = React.useState("Select Category");
-  const [tags, setTags] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [objectives, setObjectives] = React.useState("");
   const [activeStatus, setActiveStatus] = React.useState(true);
@@ -46,6 +46,7 @@ export default function CreateSubjectPage() {
   const [coverError, setCoverError] = React.useState<string>("");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [showModal, setShowModal] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   // Topics state
   const [topics, setTopics] = React.useState<Topic[]>([]);
@@ -101,6 +102,63 @@ export default function CreateSubjectPage() {
     setTopics((prev) => prev.filter((t) => t.id !== id));
   }
 
+  function getStatusValue() {
+    // Active → pending review for validators; inactive → draft
+    return activeStatus ? "PENDING" : "DRAFT";
+  }
+
+  function getObjectivesArray(): string[] {
+    if (!objectives.trim()) return [];
+    return objectives
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  }
+
+  async function handlePublish() {
+    if (isSubmitting) return;
+
+    if (!name.trim()) {
+      showErrorToast("Subject name is required.");
+      return;
+    }
+    if (!grade || grade === "Select grade") {
+      showErrorToast("Please select a grade level.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+      if (!token) {
+        showErrorToast("Missing authentication token. Please sign in again.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const payload = {
+        name: name.trim(),
+        grade: grade.toUpperCase(),
+        status: getStatusValue(),
+        description: description.trim(),
+        // We don't yet upload the actual file; backend expects a string/URL, so send null for now.
+        thumbnail: null as string | null,
+        objectives: getObjectivesArray(),
+      };
+
+      await createSubject(payload, token);
+
+      showSuccessToast("Subject created successfully.");
+      setShowModal(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to create subject. Please try again.";
+      showErrorToast(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -116,7 +174,13 @@ export default function CreateSubjectPage() {
           </p>
         </div>
         <div className="hidden gap-3 sm:flex">
-          <button className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Save Draft</button>
+          <button
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            type="button"
+            disabled={isSubmitting}
+          >
+            Save Draft
+          </button>
           {step === 1 && (
             <button onClick={() => setStep(2)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
           )}
@@ -124,7 +188,14 @@ export default function CreateSubjectPage() {
             <button onClick={() => setStep(3)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
           )}
           {step === 3 && (
-            <button onClick={() => setShowModal(true)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Publish</button>
+            <button
+              type="button"
+              onClick={handlePublish}
+              disabled={isSubmitting}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? "Publishing..." : "Publish"}
+            </button>
           )}
         </div>
       </div>
@@ -139,30 +210,12 @@ export default function CreateSubjectPage() {
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <label className="mb-2 block text-sm font-medium text-gray-800">Subject Name</label>
           <input value={name} onChange={(e)=>setName(e.target.value)} type="text" placeholder="eg. Maths" className="h-11 w-full max-w-3xl rounded-lg border border-gray-300 px-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"/>
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start max-w-3xl">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-800">Grade level</label>
-              <select value={grade} onChange={(e)=>setGrade(e.target.value)} className="h-11 w-full rounded-lg border border-gray-300 px-3 text-gray-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500">
-                <option>Select grade</option>
-                {Array.from({length:12}).map((_,i)=>(<option key={i+1}>{`Grade ${i+1}`}</option>))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-800">Subject Category</label>
-              <select value={category} onChange={(e)=>setCategory(e.target.value)} className="h-11 w-full rounded-lg border border-gray-300 px-3 text-gray-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500">
-                <option>Select Category</option>
-                <option>Mathematics</option>
-                <option>English</option>
-                <option>Science</option>
-              </select>
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-800">Tags</label>
-              <span className="text-xs text-gray-500">(optional)</span>
-            </div>
-            <input value={tags} onChange={(e)=>setTags(e.target.value)} type="text" placeholder="eg. Introduction to Algebra" className="mt-2 h-11 w-full max-w-3xl rounded-lg border border-gray-300 px-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"/>
+          <div className="mt-4 max-w-3xl">
+            <label className="mb-2 block text-sm font-medium text-gray-800">Grade level</label>
+            <select value={grade} onChange={(e)=>setGrade(e.target.value)} className="h-11 w-full rounded-lg border border-gray-300 px-3 text-gray-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500">
+              <option>Select grade</option>
+              {Array.from({length:12}).map((_,i)=>(<option key={i+1}>{`Grade ${i+1}`}</option>))}
+            </select>
           </div>
         </section>
 
@@ -175,10 +228,16 @@ export default function CreateSubjectPage() {
         {/* Objectives */}
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-800">learning Objectives</label>
-            <span className="text-xs text-gray-500">(Optional)</span>
+            <label className="text-sm font-medium text-gray-800">Learning Objectives</label>
+            <span className="text-xs text-gray-500">(Optional, separate each objective with a comma)</span>
           </div>
-          <textarea value={objectives} onChange={(e)=>setObjectives(e.target.value)} rows={5} placeholder="List the key learning Objectives for this subject" className="mt-2 w-full max-w-3xl resize-y rounded-lg border border-gray-300 p-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"/>
+          <textarea
+            value={objectives}
+            onChange={(e) => setObjectives(e.target.value)}
+            rows={5}
+            placeholder="Example: Understand numbers up to 100, Add and subtract within 20, Recognize basic shapes"
+            className="mt-2 w-full max-w-3xl resize-y rounded-lg border border-gray-300 p-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+          />
         </section>
 
         {/* Status */}
@@ -236,7 +295,13 @@ export default function CreateSubjectPage() {
 
         {/* Mobile Actions */}
         <div className="flex gap-3 sm:hidden">
-          <button className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Save Draft</button>
+          <button
+            type="button"
+            className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            disabled={isSubmitting}
+          >
+            Save Draft
+          </button>
           {step === 1 ? (
             <button onClick={() => setStep(2)} className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
           ) : null}
@@ -296,7 +361,6 @@ export default function CreateSubjectPage() {
               <h2 className="mt-4 text-xl sm:text-2xl font-semibold text-gray-900">{name || "Untitled Subject"}</h2>
               <div className="mt-2 flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-gray-700">
                 {grade !== "Select grade" ? <span>Grade {grade.replace("Grade ", "")}</span> : null}
-                {category !== "Select Category" ? <span>{category}</span> : null}
                 <span className={`rounded-full px-2 py-0.5 text-xs ${activeStatus ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"}`}>{activeStatus ? "Active" : "Draft"}</span>
               </div>
               {description ? (
@@ -337,8 +401,22 @@ export default function CreateSubjectPage() {
               ) : null}
             </div>
             <div className="flex justify-between">
-              <button onClick={() => setStep(2)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
-              <button onClick={() => setShowModal(true)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Publish</button>
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                disabled={isSubmitting}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handlePublish}
+                disabled={isSubmitting}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? "Publishing..." : "Publish"}
+              </button>
             </div>
           </section>
         )}

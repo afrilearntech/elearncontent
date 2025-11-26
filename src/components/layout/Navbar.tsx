@@ -8,10 +8,12 @@ import Link from "next/link";
 type NavbarProps = {
   rightContent?: React.ReactNode;
   onMenuClick?: () => void;
+  userRole?: string;
 };
 
-export default function Navbar({ rightContent, onMenuClick }: NavbarProps) {
+export default function Navbar({ rightContent, onMenuClick, userRole }: NavbarProps) {
   const pathname = usePathname();
+  const isValidator = userRole?.toLowerCase().includes("validator");
 
   const currentTitle = React.useMemo(() => {
     if (!pathname) return "";
@@ -56,13 +58,13 @@ export default function Navbar({ rightContent, onMenuClick }: NavbarProps) {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3 flex-shrink-0">
-          {pathname.startsWith("/subjects") ? (
+          {!isValidator && pathname.startsWith("/subjects") ? (
             <Link href="/subjects/create" className="hidden sm:inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-white shadow hover:bg-emerald-700">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Create Subject
             </Link>
           ) : null}
-          {pathname.startsWith("/lessons") ? (
+          {!isValidator && pathname.startsWith("/lessons") ? (
             <Link href="/lessons/create" className="hidden sm:inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-white shadow hover:bg-emerald-700">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Create Lesson

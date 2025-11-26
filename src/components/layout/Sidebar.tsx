@@ -15,9 +15,14 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", iconSrc: "/img/icons/dash-icon.png" },
   { href: "/subjects", label: "Subjects", iconSrc: "/img/icons/subject-icon.png" },
+  { href: "/assessments", label: "Assessment", iconSrc: "/img/icons/subject-icon.png" },
   { href: "/lessons", label: "Lessons", iconSrc: "/img/icons/lessons.png" },
+  { href: "/games", label: "Games", iconSrc: "/img/icons/subject-icon.png" },
+  { href: "/teachers", label: "Teachers", iconSrc: "/img/icons/subject-icon.png" },
   { href: "/settings", label: "Settings", iconSrc: "/img/icons/settings.png" },
 ];
+
+const creatorVisibleRoutes = new Set(["/dashboard", "/subjects", "/lessons", "/settings"]);
 
 function isActivePath(pathname: string, href: string) {
   if (href === "/dashboard") return pathname === "/" || pathname.startsWith("/dashboard");
@@ -33,6 +38,8 @@ type SidebarProps = {
 
 export default function Sidebar({ mobileOpen = false, onClose, userName = "Bertha Jones", userRole = "Content Creator" }: SidebarProps) {
   const pathname = usePathname();
+  const isValidator = userRole === "Content Validator";
+  const filteredNavItems = isValidator ? navItems : navItems.filter((item) => creatorVisibleRoutes.has(item.href));
 
   return (
     <>
@@ -40,7 +47,7 @@ export default function Sidebar({ mobileOpen = false, onClose, userName = "Berth
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 shrink-0 border-r border-black/5 bg-white/95 pt-4 sm:block">
       <nav className="flex h-full flex-col">
         <ul className="px-3 py-2 mt-24 space-y-[15px]">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const active = isActivePath(pathname, item.href);
             return (
               <li key={item.href}>
@@ -73,7 +80,16 @@ export default function Sidebar({ mobileOpen = false, onClose, userName = "Berth
               </div>
             </div>
             {/* Logout Button */}
-            <button className="flex items-center justify-center gap-2 rounded-full bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 w-[220px] h-[50px] mx-auto">
+            <button 
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  localStorage.removeItem("auth_token");
+                  localStorage.removeItem("user");
+                  window.location.href = "/sign-in";
+                }
+              }}
+              className="flex items-center justify-center gap-2 rounded-full bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 w-[220px] h-[50px] mx-auto"
+            >
               <Image src="/img/icons/logout.png" alt="" width={16} height={16} />
               Logout
             </button>
@@ -87,7 +103,7 @@ export default function Sidebar({ mobileOpen = false, onClose, userName = "Berth
           <div className="relative h-full w-64 bg-white border-r border-black/5 pt-4 shadow-xl">
             <nav className="flex h-full flex-col">
               <ul className="px-3 py-2 mt-6 space-y-[15px]">
-                {navItems.map((item) => {
+                {filteredNavItems.map((item) => {
                   const active = isActivePath(pathname, item.href);
                   return (
                     <li key={item.href}>
@@ -119,8 +135,19 @@ export default function Sidebar({ mobileOpen = false, onClose, userName = "Berth
                     {userRole}
                   </div>
                 </div>
-                {/* Logout Button */}
-                <button className="flex items-center justify-center gap-2 rounded-full bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 w-[220px] h-[50px] mx-auto" onClick={onClose}>
+                <button 
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      localStorage.removeItem("auth_token");
+                      localStorage.removeItem("user");
+                      window.location.href = "/sign-in";
+                    }
+                    if (onClose) {
+                      onClose();
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 rounded-full bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 w-[220px] h-[50px] mx-auto"
+                >
                   <Image src="/img/icons/logout.png" alt="" width={16} height={16} />
                   Logout
                 </button>
