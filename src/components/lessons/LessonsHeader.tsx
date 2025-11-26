@@ -2,27 +2,34 @@
 
 import React from "react";
 
- type LessonsHeaderProps = {
+type LessonsHeaderProps = {
   search?: string;
   subject?: string;
   grade?: string;
   status?: string;
+  subjectOptions?: string[];
+  gradeOptions?: string[];
   onSearch?: (v: string) => void;
   onSubjectChange?: (v: string) => void;
   onGradeChange?: (v: string) => void;
   onStatusChange?: (v: string) => void;
 };
 
- export default function LessonsHeader({
+export default function LessonsHeader({
   search = "",
   subject = "All",
   grade = "All",
   status = "All",
+  subjectOptions = [],
+  gradeOptions = [],
   onSearch,
   onSubjectChange,
   onGradeChange,
   onStatusChange,
 }: LessonsHeaderProps) {
+  const computedSubjects = subjectOptions.length ? subjectOptions : ["Mathematics", "English", "Science"];
+  const computedGrades = gradeOptions.length ? gradeOptions : Array.from({ length: 12 }).map((_, i) => `Grade ${i + 1}`);
+
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -37,19 +44,21 @@ import React from "react";
           <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
             <select className="min-w-[140px] rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700" value={subject} onChange={(e) => onSubjectChange?.(e.target.value)}>
               <option>All</option>
-              <option>Maths</option>
-              <option>English</option>
+              {computedSubjects.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
             </select>
             <select className="min-w-[120px] rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700" value={grade} onChange={(e) => onGradeChange?.(e.target.value)}>
               <option>All</option>
-              {Array.from({ length: 12 }).map((_, i) => (
-                <option key={i + 1}>{`Grade ${i + 1}`}</option>
+              {computedGrades.map((option) => (
+                <option key={option}>{option}</option>
               ))}
             </select>
             <select className="min-w-[120px] rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700" value={status} onChange={(e) => onStatusChange?.(e.target.value)}>
               <option>All</option>
-              <option>Draft</option>
-              <option>Published</option>
+              <option>Validated</option>
+              <option>Pending</option>
+              <option>Rejected</option>
             </select>
           </div>
         </div>

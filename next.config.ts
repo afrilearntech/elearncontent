@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
+      {
+        protocol: "https",
+        hostname: "afrilearnspace.ams3.digitaloceanspaces.com",
+      },
     ],
   },
 };

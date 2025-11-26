@@ -3,13 +3,13 @@
 import Image from "next/image";
 import React from "react";
 
-export type SubjectStatus = "APPROVED" | "PENDING" | "DRAFT";
+export type SubjectStatus = "APPROVED" | "PENDING" | "DRAFT" | "REJECTED";
 
 export type SubjectCardProps = {
   title: string;
   grade: string;
   lessonsCount: number;
-  imageSrc: string;
+  imageSrc?: string | null;
   status?: SubjectStatus;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -19,15 +19,27 @@ const statusStyles: Record<SubjectStatus, { bg: string; text: string }> = {
   APPROVED: { bg: "bg-emerald-100", text: "text-emerald-700" },
   PENDING: { bg: "bg-amber-100", text: "text-amber-700" },
   DRAFT: { bg: "bg-gray-100", text: "text-gray-600" },
+  REJECTED: { bg: "bg-rose-100", text: "text-rose-700" },
 };
 
 export default function SubjectCard({ title, grade, lessonsCount, imageSrc, status = "APPROVED", onEdit, onDelete }: SubjectCardProps) {
   const style = statusStyles[status];
-  const isLocalBlob = imageSrc.startsWith("blob:") || imageSrc.startsWith("data:");
+  const hasImage = Boolean(imageSrc);
+  const isLocalBlob = hasImage && (imageSrc!.startsWith("blob:") || imageSrc!.startsWith("data:"));
+  const gradeLabel = /^grade/i.test(grade) ? grade : `Grade ${grade}`;
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm max-w-[360px] mx-auto w-full">
-      <div className="relative h-[180px] w-full overflow-hidden rounded-t-xl">
-        <Image src={imageSrc} alt={title} fill sizes="(min-width: 1024px) 33vw, 100vw" className="object-cover" unoptimized={isLocalBlob} />
+      <div className="relative h-[180px] w-full overflow-hidden rounded-t-xl bg-gray-100">
+        {hasImage ? (
+          <Image
+            src={imageSrc as string}
+            alt={title}
+            fill
+            sizes="(min-width: 1024px) 33vw, 100vw"
+            className="object-cover"
+            unoptimized={isLocalBlob}
+          />
+        ) : null}
         <div className="absolute right-3 top-3">
           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${style.bg} ${style.text}`}>{status}</span>
         </div>
@@ -35,8 +47,10 @@ export default function SubjectCard({ title, grade, lessonsCount, imageSrc, stat
       <div className="p-4">
         <h3 className="text-base font-semibold text-gray-900">{title}</h3>
         <div className="mt-2 flex items-center gap-6 text-sm text-gray-600">
-          <span>Grade {grade}</span>
-          <span>{lessonsCount} Lessons</span>
+          <span>{gradeLabel}</span>
+          <span>
+            {lessonsCount} {lessonsCount === 1 ? "Lesson" : "Lessons"}
+          </span>
         </div>
         <div className="mt-3 flex items-center justify-end gap-3 text-gray-400">
           <button aria-label="Delete" onClick={onDelete} className="hover:text-gray-600">

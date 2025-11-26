@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+import { contentLogin } from "@/lib/api/auth";
+import { ApiClientError } from "@/lib/api/client";
+import { showSuccessToast, showErrorToast, formatErrorMessage } from "@/lib/toast";
 
 const roles = [
   {
@@ -19,6 +23,7 @@ const roles = [
 type RoleId = (typeof roles)[number]["id"];
 
 export default function ContentLoginPage() {
+  const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<RoleId>("validator");
   const [formData, setFormData] = useState({ identifier: "", password: "" });
   const [errors, setErrors] = useState<{ identifier?: string; password?: string }>(
@@ -49,11 +54,62 @@ export default function ContentLoginPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!validateForm()) return;
+    
     setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 1500);
+    setErrors({});
+
+    try {
+      const response = await contentLogin({
+        identifier: formData.identifier,
+        password: formData.password,
+      });
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("auth_token", response.token);
+        localStorage.setItem("user", JSON.stringify(response.user));
+      }
+
+      showSuccessToast("🎉 Login successful! Redirecting...");
+      
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 1500);
+    } catch (error: unknown) {
+      if (error instanceof ApiClientError) {
+        if (error.errors) {
+          const fieldErrors: Record<string, string> = {};
+          Object.keys(error.errors).forEach((key) => {
+            const errorMessages = error.errors![key];
+            if (errorMessages && errorMessages.length > 0) {
+              fieldErrors[key] = errorMessages[0];
+            }
+          });
+          setErrors(fieldErrors);
+          
+          const errorCount = Object.keys(fieldErrors).length;
+          if (errorCount > 0) {
+            const firstError = Object.values(fieldErrors)[0];
+            showErrorToast(formatErrorMessage(firstError));
+          } else {
+            showErrorToast(formatErrorMessage(error.message));
+          }
+        } else {
+          setErrors({
+            identifier: error.message.includes("identifier") || error.message.includes("email") || error.message.includes("username") ? formatErrorMessage(error.message) : undefined,
+            password: error.message.includes("password") ? formatErrorMessage(error.message) : undefined,
+          });
+          showErrorToast(formatErrorMessage(error.message));
+        }
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+        showErrorToast(formatErrorMessage(errorMessage));
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -122,10 +178,10 @@ export default function ContentLoginPage() {
                 value={formData.identifier}
                 onChange={handleInputChange}
                 placeholder="Email Address or Username"
-                className={`w-full h-[50px] px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                className={`w-full h-[50px] px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 ${
                   errors.identifier ? "border-red-500" : "border-gray-300"
                 }`}
-                style={{ fontFamily: "Poppins, sans-serif" }}
+                style={{ fontFamily: "Poppins, sans-serif", color: "#111827" }}
               />
               {errors.identifier && (
                 <p
@@ -152,10 +208,10 @@ export default function ContentLoginPage() {
                   onChange={handleInputChange}
                   placeholder="Password"
                   autoComplete="off"
-                  className={`w-full h-[50px] px-4 py-3 pr-20 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  className={`w-full h-[50px] px-4 py-3 pr-20 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 ${
                     errors.password ? "border-red-500" : "border-gray-300"
                   }`}
-                  style={{ fontFamily: "Poppins, sans-serif" }}
+                  style={{ fontFamily: "Poppins, sans-serif", color: "#111827" }}
                 />
                 <button
                   type="button"
