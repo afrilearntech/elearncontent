@@ -22,7 +22,7 @@ const navItems: NavItem[] = [
   { href: "/settings", label: "Settings", iconSrc: "/img/icons/settings.png" },
 ];
 
-const creatorVisibleRoutes = new Set(["/dashboard", "/subjects", "/lessons", "/settings"]);
+const creatorVisibleRoutes = new Set(["/dashboard", "/subjects", "/lessons", "/games", "/settings"]);
 
 function isActivePath(pathname: string, href: string) {
   if (href === "/dashboard") return pathname === "/" || pathname.startsWith("/dashboard");

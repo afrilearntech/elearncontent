@@ -3,7 +3,7 @@
 import Link from "next/link";
 import React from "react";
 import { useRouter } from "next/navigation";
-import { createSubject } from "@/lib/api/subjects";
+import { createSubject, createTopic, getTopics, getSubjectById, updateSubject } from "@/lib/api/subjects";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 type Topic = {
@@ -11,6 +11,7 @@ type Topic = {
   title: string;
   description?: string;
   expanded?: boolean;
+  apiId?: number;
 };
 
 function Stepper({ active }: { active: 1 | 2 | 3 }) {
@@ -37,22 +38,29 @@ export default function CreateSubjectPage() {
   const router = useRouter();
   const [step, setStep] = React.useState<1 | 2 | 3>(1);
   const [name, setName] = React.useState("");
-  const [grade, setGrade] = React.useState("Select grade");
+  const [grade, setGrade] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [objectives, setObjectives] = React.useState("");
+  const [objectivesList, setObjectivesList] = React.useState<string[]>([]);
+  const [currentObjective, setCurrentObjective] = React.useState("");
   const [activeStatus, setActiveStatus] = React.useState(true);
   const [coverPreview, setCoverPreview] = React.useState<string | null>(null);
   const [coverName, setCoverName] = React.useState<string>("");
   const [coverError, setCoverError] = React.useState<string>("");
+  const [coverFile, setCoverFile] = React.useState<File | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [showModal, setShowModal] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [subjectId, setSubjectId] = React.useState<number | null>(null);
+  const [isCreatingSubject, setIsCreatingSubject] = React.useState(false);
+  const [isLoadingTopics, setIsLoadingTopics] = React.useState(false);
+  const [isLoadingSubject, setIsLoadingSubject] = React.useState(false);
+  const [subjectData, setSubjectData] = React.useState<any>(null);
 
-  // Topics state
   const [topics, setTopics] = React.useState<Topic[]>([]);
   const [showTopicModal, setShowTopicModal] = React.useState(false);
   const [topicTitle, setTopicTitle] = React.useState("");
   const [topicDesc, setTopicDesc] = React.useState("");
+  const [isCreatingTopic, setIsCreatingTopic] = React.useState(false);
 
   function onChooseFileClick() {
     fileInputRef.current?.click();
@@ -66,11 +74,13 @@ export default function CreateSubjectPage() {
       setCoverError("File too large (max 10MB)");
       setCoverPreview(null);
       setCoverName("");
+      setCoverFile(null);
       return;
     }
     const url = URL.createObjectURL(file);
     setCoverPreview(url);
     setCoverName(file.name);
+    setCoverFile(file);
   }
 
   function onRemoveFile() {
@@ -80,18 +90,66 @@ export default function CreateSubjectPage() {
     setCoverPreview(null);
     setCoverName("");
     setCoverError("");
+    setCoverFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   }
 
-  function addTopic() {
+  async function fetchTopics(subjectIdParam: number, token: string) {
+    setIsLoadingTopics(true);
+    try {
+      const topicsData = await getTopics(token, subjectIdParam);
+      const mappedTopics: Topic[] = topicsData.map((t) => ({
+        id: t.id.toString(),
+        title: t.name,
+        description: "",
+        expanded: false,
+        apiId: t.id,
+      }));
+      setTopics(mappedTopics);
+    } catch (error) {
+      console.error("Failed to fetch topics:", error);
+    } finally {
+      setIsLoadingTopics(false);
+    }
+  }
+
+  async function addTopic() {
     if (!topicTitle.trim()) return;
-    const id = Date.now().toString();
-    setTopics((prev) => [...prev, { id, title: topicTitle.trim(), description: topicDesc.trim(), expanded: false }]);
-    setShowTopicModal(false);
-    setTopicTitle("");
-    setTopicDesc("");
+    if (!subjectId) {
+      showErrorToast("Subject must be created first");
+      return;
+    }
+
+    setIsCreatingTopic(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+      if (!token) {
+        showErrorToast("Missing authentication token. Please sign in again.");
+        setIsCreatingTopic(false);
+        return;
+      }
+
+      await createTopic(
+        {
+          subject: subjectId,
+          name: topicTitle.trim(),
+        },
+        token
+      );
+
+      await fetchTopics(subjectId, token);
+      setShowTopicModal(false);
+      setTopicTitle("");
+      setTopicDesc("");
+      showSuccessToast("Topic added successfully");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to create topic. Please try again.";
+      showErrorToast(message);
+    } finally {
+      setIsCreatingTopic(false);
+    }
   }
 
   function toggleTopic(id: string) {
@@ -103,33 +161,138 @@ export default function CreateSubjectPage() {
   }
 
   function getStatusValue() {
-    // Active → pending review for validators; inactive → draft
-    return activeStatus ? "PENDING" : "DRAFT";
+    return "DRAFT";
   }
 
-  function getObjectivesArray(): string[] {
-    if (!objectives.trim()) return [];
-    return objectives
-      .split(",")
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0);
+  function getObjectivesString(): string {
+    return objectivesList
+      .map((item) => String(item).trim())
+      .filter((item) => item.length > 0)
+      .join(", ");
   }
 
-  async function handlePublish() {
-    if (isSubmitting) return;
+  function addObjective() {
+    if (!currentObjective.trim()) return;
+    setObjectivesList((prev) => [...prev, currentObjective.trim()]);
+    setCurrentObjective("");
+  }
 
+  function removeObjective(index: number) {
+    setObjectivesList((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleStep1Next() {
     if (!name.trim()) {
       showErrorToast("Subject name is required.");
       return;
     }
-    if (!grade || grade === "Select grade") {
+    if (!grade) {
       showErrorToast("Please select a grade level.");
       return;
     }
 
-    try {
-      setIsSubmitting(true);
+    if (subjectId) {
+      setStep(2);
+      return;
+    }
 
+    setIsCreatingSubject(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+      if (!token) {
+        showErrorToast("Missing authentication token. Please sign in again.");
+        setIsCreatingSubject(false);
+        return;
+      }
+
+    if (!grade) {
+      showErrorToast("Please select a grade level.");
+      setIsCreatingSubject(false);
+      return;
+    }
+
+      const objectivesString = getObjectivesString();
+      
+      const payload = {
+        name: name.trim(),
+        grade: grade,
+        status: "DRAFT",
+        description: description.trim() || "",
+        thumbnail: coverFile || null,
+        objectives: objectivesString,
+      };
+
+      const response = await createSubject(payload, token);
+      if (response && response.id) {
+        const newSubjectId = response.id;
+        setSubjectId(newSubjectId);
+        try {
+          await fetchTopics(newSubjectId, token);
+        } catch (error) {
+          console.error("Failed to fetch topics:", error);
+        }
+        setStep(2);
+        showSuccessToast("Subject created. Now add topics.");
+      } else {
+        console.error("Invalid response format:", response);
+        showErrorToast("Subject created but failed to get subject ID. Please refresh and try again.");
+      }
+    } catch (error) {
+      let message = "Unable to create subject. Please try again.";
+      if (error instanceof Error) {
+        message = error.message;
+        if (error.name === "ApiClientError" && (error as any).errors) {
+          const apiErrors = (error as any).errors;
+          const errorMessages = Object.entries(apiErrors)
+            .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : value}`)
+            .join("; ");
+          message = errorMessages || message;
+        }
+      }
+      showErrorToast(message);
+      console.error("Subject creation error:", error);
+    } finally {
+      setIsCreatingSubject(false);
+    }
+  }
+
+  React.useEffect(() => {
+    if (step === 2 && subjectId) {
+      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+      if (token) {
+        fetchTopics(subjectId, token);
+      }
+    }
+  }, [step, subjectId]);
+
+  React.useEffect(() => {
+    if (step === 3 && subjectId) {
+      const fetchSubjectData = async () => {
+        setIsLoadingSubject(true);
+        try {
+          const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+          if (!token) {
+            showErrorToast("Missing authentication token. Please sign in again.");
+            return;
+          }
+          const data = await getSubjectById(subjectId, token);
+          setSubjectData(data);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unable to load subject details.";
+          showErrorToast(message);
+        } finally {
+          setIsLoadingSubject(false);
+        }
+      };
+      fetchSubjectData();
+    }
+  }, [step, subjectId]);
+
+  async function handlePublish() {
+    if (isSubmitting || !subjectId) return;
+
+    setIsSubmitting(true);
+    try {
       const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
       if (!token) {
         showErrorToast("Missing authentication token. Please sign in again.");
@@ -137,22 +300,18 @@ export default function CreateSubjectPage() {
         return;
       }
 
-      const payload = {
-        name: name.trim(),
-        grade: grade.toUpperCase(),
-        status: getStatusValue(),
-        description: description.trim(),
-        // We don't yet upload the actual file; backend expects a string/URL, so send null for now.
-        thumbnail: null as string | null,
-        objectives: getObjectivesArray(),
-      };
+      await updateSubject(
+        subjectId,
+        {
+          status: "PENDING",
+        },
+        token
+      );
 
-      await createSubject(payload, token);
-
-      showSuccessToast("Subject created successfully.");
+      showSuccessToast("Subject published successfully.");
       setShowModal(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to create subject. Please try again.";
+      const message = error instanceof Error ? error.message : "Unable to publish subject. Please try again.";
       showErrorToast(message);
     } finally {
       setIsSubmitting(false);
@@ -182,7 +341,13 @@ export default function CreateSubjectPage() {
             Save Draft
           </button>
           {step === 1 && (
-            <button onClick={() => setStep(2)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
+            <button 
+              onClick={handleStep1Next} 
+              disabled={isCreatingSubject}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isCreatingSubject ? "Creating..." : "Next Step"}
+            </button>
           )}
           {step === 2 && (
             <button onClick={() => setStep(3)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
@@ -213,8 +378,8 @@ export default function CreateSubjectPage() {
           <div className="mt-4 max-w-3xl">
             <label className="mb-2 block text-sm font-medium text-gray-800">Grade level</label>
             <select value={grade} onChange={(e)=>setGrade(e.target.value)} className="h-11 w-full rounded-lg border border-gray-300 px-3 text-gray-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500">
-              <option>Select grade</option>
-              {Array.from({length:12}).map((_,i)=>(<option key={i+1}>{`Grade ${i+1}`}</option>))}
+              <option value="">Select grade</option>
+              {Array.from({length:12}).map((_,i)=>(<option key={i+1} value={`GRADE ${i+1}`}>{`GRADE ${i+1}`}</option>))}
             </select>
           </div>
         </section>
@@ -227,17 +392,55 @@ export default function CreateSubjectPage() {
 
         {/* Objectives */}
         <section className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="flex items-center gap-2">
+          <div className="mb-3">
             <label className="text-sm font-medium text-gray-800">Learning Objectives</label>
-            <span className="text-xs text-gray-500">(Optional, separate each objective with a comma)</span>
+            <span className="text-xs text-gray-500 ml-2">(Optional)</span>
           </div>
-          <textarea
-            value={objectives}
-            onChange={(e) => setObjectives(e.target.value)}
-            rows={5}
-            placeholder="Example: Understand numbers up to 100, Add and subtract within 20, Recognize basic shapes"
-            className="mt-2 w-full max-w-3xl resize-y rounded-lg border border-gray-300 p-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
-          />
+          
+          {objectivesList.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {objectivesList.map((obj, idx) => (
+                <div key={idx} className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm text-emerald-700 border border-emerald-200">
+                  <span>{obj}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeObjective(idx)}
+                    className="ml-1 rounded-full hover:bg-emerald-100 p-0.5"
+                    aria-label="Remove objective"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={currentObjective}
+              onChange={(e) => setCurrentObjective(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addObjective();
+                }
+              }}
+              placeholder="Enter an objective and press Enter or click Add"
+              className="flex-1 h-11 rounded-lg border border-gray-300 px-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+            />
+            <button
+              type="button"
+              onClick={addObjective}
+              disabled={!currentObjective.trim()}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Add
+            </button>
+          </div>
         </section>
 
         {/* Status */}
@@ -303,7 +506,13 @@ export default function CreateSubjectPage() {
             Save Draft
           </button>
           {step === 1 ? (
-            <button onClick={() => setStep(2)} className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
+            <button 
+              onClick={handleStep1Next} 
+              disabled={isCreatingSubject}
+              className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isCreatingSubject ? "Creating..." : "Next Step"}
+            </button>
           ) : null}
         </div>
 
@@ -317,7 +526,9 @@ export default function CreateSubjectPage() {
             <div className="rounded-xl border border-gray-200 bg-white p-4">
               <h3 className="mb-3 text-base font-semibold text-gray-900">Added Subject</h3>
               <div className="space-y-3">
-                {topics.length === 0 ? (
+                {isLoadingTopics ? (
+                  <div className="text-sm text-gray-600">Loading topics...</div>
+                ) : topics.length === 0 ? (
                   <div className="text-sm text-gray-600">No topics added yet.</div>
                 ) : (
                   topics.map((t) => (
@@ -338,14 +549,35 @@ export default function CreateSubjectPage() {
                   ))
                 )}
               </div>
-              <button onClick={() => setShowTopicModal(true)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 px-4 py-6 text-emerald-700 hover:bg-emerald-100">
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowTopicModal(true);
+                }} 
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 px-4 py-6 text-emerald-700 hover:bg-emerald-100"
+              >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 <span className="font-medium">Add New Topic</span>
               </button>
             </div>
             <div className="flex justify-between">
-              <button onClick={() => setStep(1)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
-              <button onClick={() => setStep(3)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Next Step</button>
+              <button 
+                type="button"
+                onClick={() => setStep(1)} 
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Back
+              </button>
+              <button 
+                type="button"
+                onClick={() => setStep(3)} 
+                disabled={isLoadingTopics}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isLoadingTopics ? "Loading..." : "Next Step"}
+              </button>
             </div>
           </section>
         ) : (
@@ -354,29 +586,95 @@ export default function CreateSubjectPage() {
               This is how your subject will appear to students. Review all details before publishing
             </div>
             <div className="rounded-xl border border-gray-200 bg-white p-4">
-              {coverPreview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={coverPreview} alt="cover" className="mx-auto h-48 sm:h-64 w-full max-w-3xl rounded-lg object-cover" />
-              ) : null}
-              <h2 className="mt-4 text-xl sm:text-2xl font-semibold text-gray-900">{name || "Untitled Subject"}</h2>
-              <div className="mt-2 flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-gray-700">
-                {grade !== "Select grade" ? <span>Grade {grade.replace("Grade ", "")}</span> : null}
-                <span className={`rounded-full px-2 py-0.5 text-xs ${activeStatus ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"}`}>{activeStatus ? "Active" : "Draft"}</span>
-              </div>
-              {description ? (
-                <div className="mt-6">
-                  <h3 className="text-base font-semibold text-gray-900">Subject Description</h3>
-                  <p className="mt-2 text-sm leading-6 text-gray-700 whitespace-pre-wrap">{description}</p>
-                </div>
-              ) : null}
-              {objectives ? (
-                <div className="mt-6">
-                  <h3 className="text-base font-semibold text-gray-900">Learning Objectives</h3>
-                  <p className="mt-2 text-sm leading-6 text-gray-700 whitespace-pre-wrap">{objectives}</p>
-                </div>
-              ) : null}
+              {isLoadingSubject ? (
+                <div className="text-center py-8 text-sm text-gray-600">Loading subject details...</div>
+              ) : subjectData ? (
+                <>
+                  {subjectData.thumbnail ? (
+                    <img src={subjectData.thumbnail} alt="cover" className="mx-auto h-48 sm:h-64 w-full max-w-3xl rounded-lg object-cover" />
+                  ) : coverPreview ? (
+                    <img src={coverPreview} alt="cover" className="mx-auto h-48 sm:h-64 w-full max-w-3xl rounded-lg object-cover" />
+                  ) : null}
+                  <h2 className="mt-4 text-xl sm:text-2xl font-semibold text-gray-900">{subjectData.name || "Untitled Subject"}</h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-gray-700">
+                    {subjectData.grade ? <span>{subjectData.grade}</span> : null}
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${subjectData.status === "PENDING" || subjectData.status === "APPROVED" || subjectData.status === "VALIDATED" ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"}`}>
+                      {subjectData.status === "PENDING" ? "Pending" : subjectData.status === "APPROVED" || subjectData.status === "VALIDATED" ? "Approved" : "Draft"}
+                    </span>
+                  </div>
+                  {subjectData.description ? (
+                    <div className="mt-6">
+                      <h3 className="text-base font-semibold text-gray-900">Subject Description</h3>
+                      <p className="mt-2 text-sm leading-6 text-gray-700 whitespace-pre-wrap">{subjectData.description}</p>
+                    </div>
+                  ) : null}
+                  {subjectData.objectives && subjectData.objectives.length > 0 ? (
+                    <div className="mt-6">
+                      <h3 className="text-base font-semibold text-gray-900">Learning Objectives</h3>
+                      <ul className="mt-2 space-y-2">
+                        {subjectData.objectives.map((obj: string, idx: number) => (
+                          <li key={idx} className="text-sm leading-6 text-gray-700 flex items-start gap-2">
+                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                              {idx + 1}
+                            </span>
+                            <span>{obj}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  {coverPreview ? (
+                    <img src={coverPreview} alt="cover" className="mx-auto h-48 sm:h-64 w-full max-w-3xl rounded-lg object-cover" />
+                  ) : null}
+                  <h2 className="mt-4 text-xl sm:text-2xl font-semibold text-gray-900">{name || "Untitled Subject"}</h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-gray-700">
+                    {grade ? <span>{grade}</span> : null}
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${activeStatus ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"}`}>{activeStatus ? "Active" : "Draft"}</span>
+                  </div>
+                  {description ? (
+                    <div className="mt-6">
+                      <h3 className="text-base font-semibold text-gray-900">Subject Description</h3>
+                      <p className="mt-2 text-sm leading-6 text-gray-700 whitespace-pre-wrap">{description}</p>
+                    </div>
+                  ) : null}
+                  {objectivesList.length > 0 ? (
+                    <div className="mt-6">
+                      <h3 className="text-base font-semibold text-gray-900">Learning Objectives</h3>
+                      <ul className="mt-2 space-y-2">
+                        {objectivesList.map((obj, idx) => (
+                          <li key={idx} className="text-sm leading-6 text-gray-700 flex items-start gap-2">
+                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                              {idx + 1}
+                            </span>
+                            <span>{obj}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </>
+              )}
 
-              {topics.length > 0 ? (
+              {subjectData && subjectData.topics && subjectData.topics.length > 0 ? (
+                <div className="mt-6">
+                  <h3 className="text-base font-semibold text-gray-900">Topics</h3>
+                  <div className="mt-3 space-y-3">
+                    {subjectData.topics.map((t: { id: number; name: string }) => (
+                      <div key={t.id} className="rounded-lg border border-gray-200">
+                        <div className="flex w-full items-center justify-between rounded-lg px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex h-3 w-3 items-center justify-center rounded-full bg-emerald-600"></span>
+                            <span className="text-sm text-gray-800">{t.name}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : topics.length > 0 ? (
                 <div className="mt-6">
                   <h3 className="text-base font-semibold text-gray-900">Topics</h3>
                   <div className="mt-3 space-y-3">
@@ -438,11 +736,26 @@ export default function CreateSubjectPage() {
 
       {showTopicModal ? (
         <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowTopicModal(false)} />
-          <div className="relative z-101 w-full max-w-xl rounded-xl bg-white p-6 shadow-2xl">
+          <div 
+            className="absolute inset-0 bg-black/50" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowTopicModal(false);
+            }} 
+          />
+          <div 
+            className="relative z-101 w-full max-w-xl rounded-xl bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-900">Add Topic</h2>
-              <button aria-label="Close" onClick={() => setShowTopicModal(false)} className="rounded-full p-1 text-gray-500 hover:bg-gray-100">
+              <button 
+                type="button"
+                aria-label="Close" 
+                onClick={() => setShowTopicModal(false)} 
+                className="rounded-full p-1 text-gray-500 hover:bg-gray-100"
+              >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
@@ -457,7 +770,14 @@ export default function CreateSubjectPage() {
                 </div>
                 <textarea value={topicDesc} onChange={(e)=>setTopicDesc(e.target.value)} rows={6} placeholder="Learn how letters and numbers work together to solve simple math problems." className="w-full resize-y rounded-lg border border-gray-300 p-4 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500" />
               </div>
-              <button onClick={addTopic} className="mt-2 w-full rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">Submit</button>
+              <button 
+                type="button"
+                onClick={addTopic} 
+                disabled={isCreatingTopic}
+                className="mt-2 w-full rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isCreatingTopic ? "Adding..." : "Submit"}
+              </button>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { getGames, GameRecord } from "@/lib/api/games";
 import { moderateContent, ModerateAction } from "@/lib/api/lessons";
 import Image from "next/image";
@@ -81,6 +82,7 @@ async function notifySuccess(message: string) {
 
 export default function GamesPage() {
   const router = useRouter();
+  const [userRole, setUserRole] = React.useState<string>("CONTENTCREATOR");
   const [games, setGames] = React.useState<GameRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
@@ -97,6 +99,7 @@ export default function GamesPage() {
   const [pendingModerationAction, setPendingModerationAction] = React.useState<ModerateAction | null>(null);
   const [moderationLoadingAction, setModerationLoadingAction] = React.useState<ModerateAction | null>(null);
   const isModerationProcessing = moderationLoadingAction !== null;
+  const isValidator = userRole === "CONTENTVALIDATOR";
 
   const fetchGames = React.useCallback(async (showLoading = true, updateModal = false) => {
     try {
@@ -132,6 +135,18 @@ export default function GamesPage() {
       if (showLoading) {
         setIsLoading(false);
       }
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const userStr = localStorage.getItem("user");
+    if (!userStr) return;
+    try {
+      const user = JSON.parse(userStr);
+      setUserRole(user.role || "CONTENTCREATOR");
+    } catch (error) {
+      console.error("Error parsing user data:", error);
     }
   }, []);
 
@@ -287,7 +302,7 @@ export default function GamesPage() {
     [modalGame, updateGameStatusInState, closeModal, fetchGames],
   );
 
-  const showModerationActions = modalGame?.status === "PENDING";
+  const showModerationActions = isValidator && modalGame?.status === "PENDING";
 
   const handleModerationAction = React.useCallback(
     (action: ModerateAction) => {
@@ -316,7 +331,21 @@ export default function GamesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Games</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Games</h1>
+          <p className="text-sm text-gray-500">Create and manage interactive learning games.</p>
+        </div>
+        {!isValidator ? (
+          <Link
+            href="/games/create"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-emerald-700 transition-colors"
+          >
+            <span className="text-lg leading-none">+</span>
+            Create Game
+          </Link>
+        ) : null}
+      </div>
 
       <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:flex-1">
@@ -362,95 +391,166 @@ export default function GamesPage() {
         </button>
       </div>
 
-      <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
-        <div className="min-w-full">
-          <div className="grid grid-cols-12 bg-[#F1F7E4] px-5 py-4 text-sm font-semibold text-gray-800">
-            <div className="col-span-3">Game Name</div>
-            <div className="col-span-2">Type</div>
-            <div className="col-span-2">Creator</div>
-            <div className="col-span-2">Created Date</div>
-            <div className="col-span-1">Status</div>
-            <div className="col-span-2 text-right">Actions</div>
+      {isValidator ? (
+        <>
+          <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+            <div className="min-w-full">
+              <div className="grid grid-cols-12 bg-[#F1F7E4] px-5 py-4 text-sm font-semibold text-gray-800">
+                <div className="col-span-3">Game Name</div>
+                <div className="col-span-2">Type</div>
+                <div className="col-span-2">Creator</div>
+                <div className="col-span-2">Created Date</div>
+                <div className="col-span-1">Status</div>
+                <div className="col-span-2 text-right">Actions</div>
+              </div>
+              {isLoading ? (
+                <div className="px-5 py-8 text-center text-sm text-gray-600">Loading games...</div>
+              ) : loadError ? (
+                <div className="px-5 py-8 text-center text-sm text-rose-600">{loadError}</div>
+              ) : paged.length === 0 ? (
+                <div className="px-5 py-8 text-center text-sm text-gray-600">No games match your filters.</div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {paged.map((game) => (
+                    <div key={game.id} className="grid grid-cols-12 items-center px-5 py-4 text-sm hover:bg-gray-50">
+                      <div className="col-span-3 text-gray-900 font-medium">{game.name}</div>
+                      <div className="col-span-2 text-gray-700">{game.type}</div>
+                      <div className="col-span-2 text-gray-700">{game.creator}</div>
+                      <div className="col-span-2 text-gray-700">{game.date}</div>
+                      <div className="col-span-1">
+                        <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap ${getStatusBadge(game.status)}`}>
+                          {renderStatusLabel(game.status)}
+                        </span>
+                      </div>
+                      <div className="col-span-2 flex items-center justify-end">
+                        <button
+                          className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+                          onClick={() => handleReview(game)}
+                        >
+                          Review
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-          {isLoading ? (
-            <div className="px-5 py-8 text-center text-sm text-gray-600">Loading games...</div>
-          ) : loadError ? (
-            <div className="px-5 py-8 text-center text-sm text-rose-600">{loadError}</div>
-          ) : paged.length === 0 ? (
-            <div className="px-5 py-8 text-center text-sm text-gray-600">No games match your filters.</div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {paged.map((game) => (
-                <div key={game.id} className="grid grid-cols-12 items-center px-5 py-4 text-sm hover:bg-gray-50">
-                  <div className="col-span-3 text-gray-900 font-medium">{game.name}</div>
-                  <div className="col-span-2 text-gray-700">{game.type}</div>
-                  <div className="col-span-2 text-gray-700">{game.creator}</div>
-                  <div className="col-span-2 text-gray-700">{game.date}</div>
-                  <div className="col-span-1">
+
+          <div className="space-y-4 md:hidden">
+            {isLoading ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">Loading games...</div>
+            ) : loadError ? (
+              <div className="rounded-xl border border-rose-200 bg-white p-6 text-center text-sm text-rose-600">{loadError}</div>
+            ) : paged.length === 0 ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-5 text-center text-sm text-gray-600">
+                No games match your filters.
+              </div>
+            ) : (
+              paged.map((game) => (
+                <div key={game.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-gray-900">{game.name}</p>
+                      <p className="text-xs text-gray-500">{game.date}</p>
+                    </div>
                     <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap ${getStatusBadge(game.status)}`}>
                       {renderStatusLabel(game.status)}
                     </span>
                   </div>
-                  <div className="col-span-2 flex items-center justify-end">
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-700">
+                    <div>
+                      <p className="text-xs uppercase text-gray-400">Type</p>
+                      <p>{game.type}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-400">Creator</p>
+                      <p>{game.creator}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex justify-end">
                     <button
-                      className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+                      className="rounded-lg bg-emerald-600 px-5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
                       onClick={() => handleReview(game)}
                     >
                       Review
                     </button>
                   </div>
                 </div>
-              ))}
+              ))
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="space-y-4">
+          {isLoading ? (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">Loading games...</div>
+          ) : loadError ? (
+            <div className="rounded-xl border border-rose-200 bg-white p-6 text-center text-sm text-rose-600">{loadError}</div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-xl border border-gray-200 bg-white p-5 text-center text-sm text-gray-600">
+              No games match your filters.
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((game) => {
+                const isExternalImage = game.image ? game.image.startsWith("http") : false;
+                return (
+                  <button
+                    key={game.id}
+                    type="button"
+                    onClick={() => handleReview(game)}
+                    className="overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    <div className="relative h-40 w-full overflow-hidden bg-gray-100">
+                      {game.image ? (
+                        <Image
+                          src={game.image}
+                          alt={game.name}
+                          fill
+                          className="object-cover"
+                          sizes="(min-width: 1024px) 33vw, 100vw"
+                          unoptimized={isExternalImage}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">No image</div>
+                      )}
+                    </div>
+                    <div className="space-y-3 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-base font-semibold text-gray-900">{game.name}</p>
+                          <p className="text-xs text-gray-500">{game.date || "Pending date"}</p>
+                        </div>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadge(game.status)}`}>
+                          {renderStatusLabel(game.status)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {game.description ? game.description.slice(0, 120) : "No description provided yet."}
+                        {game.description && game.description.length > 120 ? "…" : ""}
+                      </p>
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-purple-700">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <line x1="9" y1="3" x2="9" y2="21" />
+                          </svg>
+                          {game.type}
+                        </span>
+                        <span>{game.creator}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      <div className="space-y-4 md:hidden">
-        {isLoading ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">Loading games...</div>
-        ) : loadError ? (
-          <div className="rounded-xl border border-rose-200 bg-white p-6 text-center text-sm text-rose-600">{loadError}</div>
-        ) : paged.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-5 text-center text-sm text-gray-600">
-            No games match your filters.
-          </div>
-        ) : (
-          paged.map((game) => (
-            <div key={game.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-base font-semibold text-gray-900">{game.name}</p>
-                  <p className="text-xs text-gray-500">{game.date}</p>
-                </div>
-                <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap ${getStatusBadge(game.status)}`}>
-                  {renderStatusLabel(game.status)}
-                </span>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-700">
-                <div>
-                  <p className="text-xs uppercase text-gray-400">Type</p>
-                  <p>{game.type}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-gray-400">Creator</p>
-                  <p>{game.creator}</p>
-                </div>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <button
-                  className="rounded-lg bg-emerald-600 px-5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
-                  onClick={() => handleReview(game)}
-                >
-                  Review
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      {isValidator ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={currentPage === 1}
@@ -508,7 +608,8 @@ export default function GamesPage() {
         >
           &gt;
         </button>
-      </div>
+        </div>
+      ) : null}
 
       {isModalOpen ? (
         <div
@@ -523,7 +624,9 @@ export default function GamesPage() {
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
               <div>
                 <p className="text-sm font-semibold text-emerald-600 uppercase">Preview of the game</p>
-                <p className="text-xs text-gray-500">Review all information before approving or requesting revisions</p>
+                <p className="text-xs text-gray-500">
+                  {isValidator ? "Review all information before approving or requesting revisions" : "Here’s the complete overview of this game."}
+                </p>
               </div>
               <button
                 aria-label="Close"
@@ -618,7 +721,22 @@ export default function GamesPage() {
                     </div>
                   </section>
 
-                  {modalGame.moderation_comment ? (
+                  {modalGame.status === "REQUEST_CHANGES" && modalGame.moderation_comment ? (
+                    <section className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-200 px-3 py-1 text-xs font-semibold text-amber-900">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                          </svg>
+                          Requested Review
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-semibold text-amber-900 mb-1">Moderator Comment</h3>
+                      <p className="mt-2 text-sm text-amber-800">{modalGame.moderation_comment}</p>
+                    </section>
+                  ) : modalGame.moderation_comment ? (
                     <section className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
                       <h3 className="text-sm font-semibold text-amber-900">Moderator Comment</h3>
                       <p className="mt-2 text-sm text-amber-900">{modalGame.moderation_comment}</p>
@@ -691,6 +809,14 @@ export default function GamesPage() {
                 >
                   Close
                 </button>
+                {!isValidator && modalGame && modalGame.status === "REQUEST_CHANGES" ? (
+                  <Link
+                    href={`/games/create?edit=${modalGame.id}`}
+                    className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                  >
+                    Edit Game
+                  </Link>
+                ) : null}
               </div>
             )}
 

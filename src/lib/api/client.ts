@@ -30,6 +30,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
         ? data.message 
         : isJson && data.error
         ? data.error
+        : isJson && data.detail
+        ? data.detail
         : `Request failed with status ${response.status}`;
     
     const errors = isJson && data.errors ? data.errors : undefined;

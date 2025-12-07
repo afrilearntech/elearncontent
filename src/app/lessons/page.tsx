@@ -7,6 +7,7 @@ import {
   ModerateAction,
 } from "@/lib/api/lessons";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React from "react";
 
@@ -126,7 +127,21 @@ export default function LessonsPage() {
   const [moderationFormError, setModerationFormError] = React.useState<string | null>(null);
   const [pendingModerationAction, setPendingModerationAction] = React.useState<ModerateAction | null>(null);
   const [moderationLoadingAction, setModerationLoadingAction] = React.useState<ModerateAction | null>(null);
+  const [userRole, setUserRole] = React.useState<string>("CONTENTCREATOR");
   const isModerationProcessing = moderationLoadingAction !== null;
+  const isValidator = userRole === "CONTENTVALIDATOR";
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const userStr = localStorage.getItem("user");
+    if (!userStr) return;
+    try {
+      const user = JSON.parse(userStr);
+      setUserRole(user.role || "CONTENTCREATOR");
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+    }
+  }, []);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -377,7 +392,7 @@ export default function LessonsPage() {
     [modalLesson, updateLessonStatusInState, closeModal, router],
   );
 
-  const showModerationActions = modalStatus === "PENDING";
+  const showModerationActions = isValidator && modalStatus === "PENDING";
 
   const handleModerationAction = React.useCallback(
     (action: ModerateAction) => {
@@ -406,6 +421,24 @@ export default function LessonsPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Lessons</h1>
+          <p className="text-sm text-gray-500">
+            {isValidator ? "Review submitted lessons awaiting moderation." : "Create, refine, and track your lesson drafts."}
+          </p>
+        </div>
+        {!isValidator ? (
+          <Link
+            href="/lessons/create"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-emerald-700 transition"
+          >
+            <span className="text-lg leading-none">+</span>
+            Create Lesson
+          </Link>
+        ) : null}
+      </div>
+
       <LessonsHeader
         search={search}
         subject={subject}
@@ -419,147 +452,207 @@ export default function LessonsPage() {
         onStatusChange={setStatus}
       />
 
-      <div className="hidden md:block rounded-xl border border-gray-200 bg-white overflow-hidden">
-        <div className="grid grid-cols-12 bg-[#F1F7E4] px-5 py-4 text-sm font-semibold text-gray-800">
-          <div className="col-span-4">Lesson Title</div>
-          <div className="col-span-2">Type</div>
-          <div className="col-span-2">Subject</div>
-          <div className="col-span-1">Grade Level</div>
-          <div className="col-span-1">Status</div>
-          <div className="col-span-2 text-right">Actions</div>
-        </div>
-        {isLoading ? (
-          <div className="px-5 py-8 text-center text-sm text-gray-600">Loading lessons...</div>
-        ) : loadError ? (
-          <div className="px-5 py-8 text-center text-sm text-rose-600">{loadError}</div>
-        ) : paged.length === 0 ? (
-          <div className="px-5 py-8 text-center text-sm text-gray-600">No lessons match your filters.</div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {paged.map((lesson) => (
-              <div key={lesson.id} className="grid grid-cols-12 items-center px-5 py-4 text-sm hover:bg-gray-50">
-                <div className="col-span-4 text-gray-900 font-medium">{lesson.title}</div>
-                <div className="col-span-2 text-gray-700">{lesson.type}</div>
-                <div className="col-span-2 text-gray-700">{lesson.subject}</div>
-                <div className="col-span-1 text-gray-700">{lesson.grade}</div>
-                <div className="col-span-1">
-                  <span className={`inline-flex max-w-[120px] justify-center rounded-lg px-2 py-1 text-[11px] font-semibold text-center leading-tight tracking-wide ${getStatusBadge(lesson.status)}`}>
-                    {renderStatusLabel(lesson.status)}
-                  </span>
-                </div>
-                <div className="col-span-2 flex items-center justify-end">
-                  <button
-                    className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
-                    onClick={() => handleReview(lesson)}
-                  >
-                    Review
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-4 md:hidden">
-        {isLoading ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">Loading lessons...</div>
-        ) : loadError ? (
-          <div className="rounded-xl border border-rose-200 bg-white p-6 text-center text-sm text-rose-600">{loadError}</div>
-        ) : paged.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">
-            No lessons match your filters.
-          </div>
-        ) : (
-          paged.map((lesson) => (
-            <div key={lesson.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-base font-semibold text-gray-900">{lesson.title}</p>
-                  <p className="text-xs text-gray-500">{lesson.date}</p>
-                </div>
-                <span className={`inline-flex max-w-[140px] justify-center rounded-lg px-3 py-1 text-[11px] font-semibold text-center leading-tight tracking-wide whitespace-nowrap ${getStatusBadge(lesson.status)}`}>
-                  {renderStatusLabel(lesson.status)}
-                </span>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-700">
-                <div>
-                  <p className="text-xs uppercase text-gray-400">Type</p>
-                  <p>{lesson.type}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-gray-400">Subject</p>
-                  <p>{lesson.subject}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-gray-400">Grade Level</p>
-                  <p>{lesson.grade}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-gray-400">Creator</p>
-                  <p>{lesson.creator}</p>
-                </div>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <button
-                  className="rounded-full bg-emerald-600 px-5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
-                  onClick={() => handleReview(lesson)}
-                >
-                  Review
-                </button>
-              </div>
+      {isValidator ? (
+        <>
+          <div className="hidden md:block rounded-xl border border-gray-200 bg-white overflow-hidden">
+            <div className="grid grid-cols-12 bg-[#F1F7E4] px-5 py-4 text-sm font-semibold text-gray-800">
+              <div className="col-span-4">Lesson Title</div>
+              <div className="col-span-2">Type</div>
+              <div className="col-span-2">Subject</div>
+              <div className="col-span-1">Grade Level</div>
+              <div className="col-span-1">Status</div>
+              <div className="col-span-2 text-right">Actions</div>
             </div>
-          ))
-        )}
-      </div>
+            {isLoading ? (
+              <div className="px-5 py-8 text-center text-sm text-gray-600">Loading lessons...</div>
+            ) : loadError ? (
+              <div className="px-5 py-8 text-center text-sm text-rose-600">{loadError}</div>
+            ) : paged.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-gray-600">No lessons match your filters.</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {paged.map((lesson) => (
+                  <div key={lesson.id} className="grid grid-cols-12 items-center px-5 py-4 text-sm hover:bg-gray-50">
+                    <div className="col-span-4 text-gray-900 font-medium">{lesson.title}</div>
+                    <div className="col-span-2 text-gray-700">{lesson.type}</div>
+                    <div className="col-span-2 text-gray-700">{lesson.subject}</div>
+                    <div className="col-span-1 text-gray-700">{lesson.grade}</div>
+                    <div className="col-span-1">
+                      <span className={`inline-flex max-w-[120px] justify-center rounded-lg px-2 py-1 text-[11px] font-semibold text-center leading-tight tracking-wide ${getStatusBadge(lesson.status)}`}>
+                        {renderStatusLabel(lesson.status)}
+                      </span>
+                    </div>
+                    <div className="col-span-2 flex items-center justify-end">
+                      <button
+                        className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+                        onClick={() => handleReview(lesson)}
+                      >
+                        Review
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={currentPage === 1}
-          className={`rounded-md border px-3 py-1.5 text-sm ${currentPage === 1 ? "border-gray-200 text-gray-300" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
-        >
-          &lt;
-        </button>
-        {Array.from({ length: Math.min(totalPages, 10) }).map((_, i) => {
-          const n = i + 1;
-          const active = n === currentPage;
-          if (totalPages > 10 && i === 8) {
-            return (
-              <React.Fragment key="ellipsis">
-                <span className="px-2 text-gray-500">...</span>
-                <button
-                  onClick={() => setPage(totalPages)}
-                  className={`rounded-md border px-3 py-1.5 text-sm ${totalPages === currentPage ? "border-emerald-600 bg-emerald-600 text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
-                >
-                  {totalPages}
-                </button>
-              </React.Fragment>
-            );
-          }
-          if (totalPages > 10 && i > 8) return null;
-          return (
+          <div className="space-y-4 md:hidden">
+            {isLoading ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">Loading lessons...</div>
+            ) : loadError ? (
+              <div className="rounded-xl border border-rose-200 bg-white p-6 text-center text-sm text-rose-600">{loadError}</div>
+            ) : paged.length === 0 ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">
+                No lessons match your filters.
+              </div>
+            ) : (
+              paged.map((lesson) => (
+                <div key={lesson.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-gray-900">{lesson.title}</p>
+                      <p className="text-xs text-gray-500">{lesson.date}</p>
+                    </div>
+                    <span className={`inline-flex max-w-[140px] justify-center rounded-lg px-3 py-1 text-[11px] font-semibold text-center leading-tight tracking-wide whitespace-nowrap ${getStatusBadge(lesson.status)}`}>
+                      {renderStatusLabel(lesson.status)}
+                    </span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-700">
+                    <div>
+                      <p className="text-xs uppercase text-gray-400">Type</p>
+                      <p>{lesson.type}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-400">Subject</p>
+                      <p>{lesson.subject}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-400">Grade Level</p>
+                      <p>{lesson.grade}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-400">Creator</p>
+                      <p>{lesson.creator}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      className="rounded-full bg-emerald-600 px-5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+                      onClick={() => handleReview(lesson)}
+                    >
+                      Review
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
-              key={n}
-              onClick={() => setPage(n)}
-              className={`rounded-md border px-3 py-1.5 text-sm ${
-                active ? "border-emerald-600 bg-emerald-600 text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50"
-              }`}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={`rounded-md border px-3 py-1.5 text-sm ${currentPage === 1 ? "border-gray-200 text-gray-300" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
             >
-              {n}
+              &lt;
             </button>
-          );
-        })}
-        <button
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={currentPage === totalPages}
-          className={`rounded-md border px-3 py-1.5 text-sm ${currentPage === totalPages ? "border-gray-200 text-gray-300" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
-        >
-          &gt;
-        </button>
-      </div>
+            {Array.from({ length: Math.min(totalPages, 10) }).map((_, i) => {
+              const n = i + 1;
+              const active = n === currentPage;
+              if (totalPages > 10 && i === 8) {
+                return (
+                  <React.Fragment key="ellipsis">
+                    <span className="px-2 text-gray-500">...</span>
+                    <button
+                      onClick={() => setPage(totalPages)}
+                      className={`rounded-md border px-3 py-1.5 text-sm ${totalPages === currentPage ? "border-emerald-600 bg-emerald-600 text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+                    >
+                      {totalPages}
+                    </button>
+                  </React.Fragment>
+                );
+              }
+              if (totalPages > 10 && i > 8) return null;
+              return (
+                <button
+                  key={n}
+                  onClick={() => setPage(n)}
+                  className={`rounded-md border px-3 py-1.5 text-sm ${
+                    active ? "border-emerald-600 bg-emerald-600 text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {n}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className={`rounded-md border px-3 py-1.5 text-sm ${currentPage === totalPages ? "border-gray-200 text-gray-300" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+            >
+              &gt;
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          {isLoading ? (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">Loading lessons...</div>
+          ) : loadError ? (
+            <div className="rounded-xl border border-rose-200 bg-white p-6 text-center text-sm text-rose-600">{loadError}</div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">No lessons match your filters.</div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((lesson) => (
+                <button
+                  key={lesson.id}
+                  type="button"
+                  onClick={() => router.push(`/lessons/create/learning-material/preview?id=${lesson.id}`)}
+                  className="group overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                >
+                  <div className="relative h-44 w-full overflow-hidden bg-gray-100">
+                    {lesson.thumbnail ? (
+                      <Image
+                        src={lesson.thumbnail}
+                        alt={lesson.title}
+                        fill
+                        className="object-cover transition duration-300 group-hover:scale-105"
+                        sizes="(min-width: 1280px) 30vw, (min-width: 768px) 45vw, 100vw"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">Thumbnail pending</div>
+                    )}
+                    <span className={`absolute right-3 top-3 rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusBadge(lesson.status)}`}>
+                      {renderStatusLabel(lesson.status)}
+                    </span>
+                  </div>
+                  <div className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-base font-semibold text-gray-900">{lesson.title}</p>
+                        <p className="text-xs text-gray-500">{lesson.date || "Awaiting date"}</p>
+                      </div>
+                      <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">{lesson.type}</span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {lesson.description
+                        ? `${lesson.description.slice(0, 110)}${lesson.description.length > 110 ? "…" : ""}`
+                        : "No description provided yet."}
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>{lesson.subject}</span>
+                      <span>{lesson.grade}</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {isModalOpen ? (
+      {isValidator && isModalOpen ? (
         <div
           className="fixed inset-0 z-120 flex items-start justify-center overflow-y-auto bg-black/60 py-10 px-4"
           onClick={(event) => {

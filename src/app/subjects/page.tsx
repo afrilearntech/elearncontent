@@ -40,8 +40,27 @@ const statusMap: Record<string, SubjectRow["status"]> = {
 
 function normalizeStatus(value?: string | null): SubjectRow["status"] {
   if (!value) return "PENDING";
-  const upper = value.toUpperCase();
-  return statusMap[upper] ?? (["VALIDATED", "REJECTED", "PENDING", "REQUEST_CHANGES"].includes(upper) ? (upper as SubjectRow["status"]) : "PENDING");
+  const trimmed = String(value).trim();
+  if (!trimmed) return "PENDING";
+  const upper = trimmed.toUpperCase();
+  
+  if (statusMap[upper]) {
+    return statusMap[upper];
+  }
+  
+  if (["VALIDATED", "REJECTED", "PENDING", "REQUEST_CHANGES", "DRAFT"].includes(upper)) {
+    return upper as SubjectRow["status"];
+  }
+  
+  if (upper.includes("PENDING") || upper === "PEND") {
+    return "PENDING";
+  }
+  
+  if (upper.includes("DRAFT")) {
+    return "DRAFT";
+  }
+  
+  return "PENDING";
 }
 
 function getLessonsCount(record: SubjectRecord): number {
@@ -244,14 +263,27 @@ export default function SubjectsPage() {
         return "bg-amber-100 text-amber-700";
       case "REQUEST_CHANGES":
         return "bg-indigo-100 text-indigo-700";
+      case "DRAFT":
+        return "bg-gray-100 text-gray-700";
+      default:
+        return "bg-gray-100 text-gray-700";
     }
   };
 
   const renderStatusLabel = (state: SubjectRow["status"]) => {
-    if (state === "VALIDATED") return "Validated";
-    if (state === "REJECTED") return "Rejected";
-    if (state === "REQUEST_CHANGES") return "Revision Requested";
-    return "Pending";
+    switch (state) {
+      case "VALIDATED":
+        return "Validated";
+      case "REJECTED":
+        return "Rejected";
+      case "REQUEST_CHANGES":
+        return "Revision Requested";
+      case "DRAFT":
+        return "Draft";
+      case "PENDING":
+      default:
+        return "Pending";
+    }
   };
 
   const handleReview = React.useCallback((subject: SubjectRow) => {
@@ -447,14 +479,20 @@ const isValidStatusFilterValue = (value: string): value is StatusFilterOption =>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((subject) => (
-              <SubjectCard
+              <button
                 key={subject.id}
-                title={subject.name}
-                grade={subject.grade}
-                lessonsCount={subject.lessonsCount}
-                imageSrc={subject.thumbnail}
-                status={getCreatorCardStatus(subject.status)}
-              />
+                type="button"
+                onClick={() => handleReview(subject)}
+                className="text-left"
+              >
+                <SubjectCard
+                  title={subject.name}
+                  grade={subject.grade}
+                  lessonsCount={subject.lessonsCount}
+                  imageSrc={subject.thumbnail}
+                  status={getCreatorCardStatus(subject.status)}
+                />
+              </button>
             ))}
           </div>
         )}
@@ -704,6 +742,7 @@ const isValidStatusFilterValue = (value: string): value is StatusFilterOption =>
                         className="object-cover"
                         sizes="(max-width: 768px) 100vw, 900px"
                         priority
+                        unoptimized={getModalThumbnail(modalSubject)?.startsWith("http") || false}
                       />
                     </div>
                   ) : null}
@@ -747,7 +786,22 @@ const isValidStatusFilterValue = (value: string): value is StatusFilterOption =>
                       </section>
                     ) : null}
 
-                    {modalSubject?.moderation_comment ? (
+                    {modalSubject?.status === "REQUEST_CHANGES" && modalSubject?.moderation_comment ? (
+                      <section className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-200 px-3 py-1 text-xs font-semibold text-amber-900">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8" x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            Requested Review
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-semibold text-amber-900 mb-1">Moderator Comment</h3>
+                        <p className="mt-2 text-sm text-amber-800">{modalSubject.moderation_comment}</p>
+                      </section>
+                    ) : modalSubject?.moderation_comment ? (
                       <section className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
                         <h3 className="text-sm font-semibold text-amber-900">Moderator Comment</h3>
                         <p className="mt-2 text-sm text-amber-900">{modalSubject.moderation_comment}</p>
@@ -842,6 +896,14 @@ const isValidStatusFilterValue = (value: string): value is StatusFilterOption =>
                 >
                   Close
                 </button>
+                {!isValidator && modalSubject && modalSubject.status === "REQUEST_CHANGES" ? (
+                  <Link
+                    href={`/subjects/create?edit=${modalSubject.id}`}
+                    className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                  >
+                    Edit Subject
+                  </Link>
+                ) : null}
               </div>
             )}
 

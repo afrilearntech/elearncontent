@@ -26,18 +26,22 @@ export default function SubjectCard({ title, grade, lessonsCount, imageSrc, stat
   const style = statusStyles[status];
   const hasImage = Boolean(imageSrc);
   const isLocalBlob = hasImage && (imageSrc!.startsWith("blob:") || imageSrc!.startsWith("data:"));
+  const isExternalUrl = hasImage && imageSrc!.startsWith("http");
   const gradeLabel = /^grade/i.test(grade) ? grade : `Grade ${grade}`;
+  const [imageError, setImageError] = React.useState(false);
+
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm max-w-[360px] mx-auto w-full">
       <div className="relative h-[180px] w-full overflow-hidden rounded-t-xl bg-gray-100">
-        {hasImage ? (
+        {hasImage && !imageError ? (
           <Image
             src={imageSrc as string}
             alt={title}
             fill
             sizes="(min-width: 1024px) 33vw, 100vw"
             className="object-cover"
-            unoptimized={isLocalBlob}
+            unoptimized={isLocalBlob || isExternalUrl}
+            onError={() => setImageError(true)}
           />
         ) : null}
         <div className="absolute right-3 top-3">
@@ -52,14 +56,34 @@ export default function SubjectCard({ title, grade, lessonsCount, imageSrc, stat
             {lessonsCount} {lessonsCount === 1 ? "Lesson" : "Lessons"}
           </span>
         </div>
-        <div className="mt-3 flex items-center justify-end gap-3 text-gray-400">
-          <button aria-label="Delete" onClick={onDelete} className="hover:text-gray-600">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
-          </button>
-          <button aria-label="Edit" onClick={onEdit} className="hover:text-gray-600">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-          </button>
-        </div>
+        {(onEdit || onDelete) && (
+          <div className="mt-3 flex items-center justify-end gap-3 text-gray-400">
+            {onDelete && (
+              <button 
+                aria-label="Delete" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }} 
+                className="hover:text-gray-600"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            )}
+            {onEdit && (
+              <button 
+                aria-label="Edit" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }} 
+                className="hover:text-gray-600"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

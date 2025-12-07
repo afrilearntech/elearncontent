@@ -7,17 +7,19 @@ import { moderateContent, ModerateAction } from "@/lib/api/lessons";
 
 type TeacherRow = {
   id: string;
-  profile: number;
+  name: string;
+  email: string;
+  phone: string;
   school: number;
-  status: "APPROVED" | "PENDING" | "REJECTED";
+  status: "APPROVED" | "PENDING" | "REJECTED" | "VALIDATED";
   created_at: string;
   updated_at: string;
   moderation_comment: string | null;
 };
 
 const statusMap: Record<string, TeacherRow["status"]> = {
-  APPROVED: "APPROVED",
-  VALIDATED: "APPROVED",
+  APPROVED: "VALIDATED",
+  VALIDATED: "VALIDATED",
   PENDING: "PENDING",
   REJECTED: "REJECTED",
   REQUEST_CHANGES: "PENDING",
@@ -29,12 +31,14 @@ const statusMap: Record<string, TeacherRow["status"]> = {
 
 function normalizeStatus(value?: string | null): TeacherRow["status"] {
   if (!value) return "PENDING";
-  const upper = value.toUpperCase();
+  const trimmed = String(value).trim();
+  if (!trimmed) return "PENDING";
+  const upper = trimmed.toUpperCase();
   if (statusMap[upper]) {
     return statusMap[upper];
   }
-  if (["APPROVED", "REJECTED", "PENDING"].includes(upper)) {
-    return upper as TeacherRow["status"];
+  if (["APPROVED", "VALIDATED", "REJECTED", "PENDING"].includes(upper)) {
+    return upper === "APPROVED" ? "VALIDATED" : (upper as TeacherRow["status"]);
   }
   return "PENDING";
 }
@@ -43,7 +47,9 @@ function mapTeacher(record: TeacherRecord): TeacherRow {
   const status = normalizeStatus(record.status);
   return {
     id: record.id.toString(),
-    profile: record.profile,
+    name: record.profile?.name || "Unknown",
+    email: record.profile?.email || "N/A",
+    phone: record.profile?.phone || "N/A",
     school: record.school,
     status,
     created_at: record.created_at,
@@ -123,18 +129,21 @@ export default function TeachersPage() {
   }, []);
 
   const renderStatusLabel = (state: TeacherRow["status"]) => {
-    if (state === "APPROVED") return "Approved";
+    if (state === "VALIDATED" || state === "APPROVED") return "Validated";
     if (state === "REJECTED") return "Rejected";
     return "Pending";
   };
 
   const getStatusBadge = (state: TeacherRow["status"]) => {
     switch (state) {
+      case "VALIDATED":
       case "APPROVED":
         return "bg-emerald-100 text-emerald-700";
       case "REJECTED":
         return "bg-rose-100 text-rose-700";
       case "PENDING":
+        return "bg-amber-100 text-amber-700";
+      default:
         return "bg-amber-100 text-amber-700";
     }
   };
@@ -155,12 +164,14 @@ export default function TeachersPage() {
       const searchTerm = search.toLowerCase();
       const matchesSearch =
         search.trim().length === 0 ||
+        teacher.name.toLowerCase().includes(searchTerm) ||
+        teacher.email.toLowerCase().includes(searchTerm) ||
+        teacher.phone.includes(searchTerm) ||
         teacher.id.includes(searchTerm) ||
-        teacher.profile.toString().includes(searchTerm) ||
         teacher.school.toString().includes(searchTerm);
       const matchesStatus =
         statusFilter === "All" ||
-        (statusFilter === "Approved" && teacher.status === "APPROVED") ||
+        (statusFilter === "Approved" && (teacher.status === "APPROVED" || teacher.status === "VALIDATED")) ||
         (statusFilter === "Pending" && teacher.status === "PENDING") ||
         (statusFilter === "Rejected" && teacher.status === "REJECTED");
       return matchesSearch && matchesStatus;
@@ -219,7 +230,7 @@ export default function TeachersPage() {
         setModerationLoadingAction(action);
         const response = await moderateContent(
           {
-            model: "school",
+            model: "teacher",
             id: parseInt(modalTeacher.id, 10),
             action,
             moderation_comment: comment,
@@ -270,7 +281,7 @@ export default function TeachersPage() {
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="Search by ID, Profile, or School..."
+              placeholder="Search by name, email, or phone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 pl-10 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500"
@@ -291,7 +302,7 @@ export default function TeachersPage() {
           >
             <option value="All">All Status</option>
             <option value="Pending">Pending</option>
-            <option value="Approved">Approved</option>
+            <option value="Approved">Validated</option>
             <option value="Rejected">Rejected</option>
           </select>
         </div>
@@ -299,12 +310,12 @@ export default function TeachersPage() {
 
       <div className="hidden md:block rounded-xl border border-gray-200 bg-white overflow-hidden">
         <div className="grid grid-cols-12 bg-[#F1F7E4] px-5 py-4 text-sm font-semibold text-gray-800">
-          <div className="col-span-2">Teacher ID</div>
-          <div className="col-span-2">Profile ID</div>
-          <div className="col-span-2">School ID</div>
-          <div className="col-span-2">Created Date</div>
-          <div className="col-span-2">Status</div>
-          <div className="col-span-2 text-right">Actions</div>
+          <div className="col-span-3">Teacher Name</div>
+          <div className="col-span-2">Email</div>
+          <div className="col-span-2">Phone</div>
+          <div className="col-span-1">School</div>
+          <div className="col-span-1">Status</div>
+          <div className="col-span-3 text-right">Actions</div>
         </div>
         {isLoading ? (
           <div className="px-5 py-8 text-center text-sm text-gray-600">Loading teachers...</div>
@@ -316,20 +327,16 @@ export default function TeachersPage() {
           <div className="divide-y divide-gray-100">
             {paged.map((teacher) => (
               <div key={teacher.id} className="grid grid-cols-12 items-center px-5 py-4 text-sm hover:bg-gray-50">
-                <div className="col-span-2 text-gray-900 font-medium">#{teacher.id}</div>
-                <div className="col-span-2 text-gray-700">Profile {teacher.profile}</div>
-                <div className="col-span-2 text-gray-700">School {teacher.school}</div>
-                <div className="col-span-2 text-gray-700">
-                  {teacher.created_at
-                    ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(teacher.created_at))
-                    : "N/A"}
-                </div>
-                <div className="col-span-2">
+                <div className="col-span-3 text-gray-900 font-medium">{teacher.name}</div>
+                <div className="col-span-2 text-gray-700">{teacher.email}</div>
+                <div className="col-span-2 text-gray-700">{teacher.phone}</div>
+                <div className="col-span-1 text-gray-700">#{teacher.school}</div>
+                <div className="col-span-1">
                   <span className={`inline-flex max-w-[120px] justify-center rounded-lg px-2 py-1 text-[11px] font-semibold text-center leading-tight tracking-wide whitespace-nowrap ${getStatusBadge(teacher.status)}`}>
                     {renderStatusLabel(teacher.status)}
                   </span>
                 </div>
-                <div className="col-span-2 flex items-center justify-end">
+                <div className="col-span-3 flex items-center justify-end">
                   <button
                     className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
                     onClick={() => handleReview(teacher)}
@@ -355,12 +362,8 @@ export default function TeachersPage() {
             <div key={teacher.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-base font-semibold text-gray-900">Teacher #{teacher.id}</p>
-                  <p className="text-xs text-gray-500">
-                    {teacher.created_at
-                      ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(teacher.created_at))
-                      : "N/A"}
-                  </p>
+                  <p className="text-base font-semibold text-gray-900">{teacher.name}</p>
+                  <p className="text-xs text-gray-500">{teacher.email}</p>
                 </div>
                 <span className={`inline-flex max-w-[140px] justify-center rounded-lg px-3 py-1 text-[11px] font-semibold text-center leading-tight tracking-wide whitespace-nowrap ${getStatusBadge(teacher.status)}`}>
                   {renderStatusLabel(teacher.status)}
@@ -368,12 +371,12 @@ export default function TeachersPage() {
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-700">
                 <div>
-                  <p className="text-xs uppercase text-gray-400">Profile ID</p>
-                  <p>Profile {teacher.profile}</p>
+                  <p className="text-xs uppercase text-gray-400">Phone</p>
+                  <p>{teacher.phone}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-gray-400">School ID</p>
-                  <p>School {teacher.school}</p>
+                  <p className="text-xs uppercase text-gray-400">School</p>
+                  <p>#{teacher.school}</p>
                 </div>
               </div>
               <div className="mt-4 flex justify-end">
@@ -466,20 +469,26 @@ export default function TeachersPage() {
                 <>
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-semibold text-gray-900">Teacher #{modalTeacher.id}</h2>
+                      <h2 className="text-2xl font-semibold text-gray-900">{modalTeacher.name}</h2>
                       <div className="mt-3 flex flex-wrap gap-3 text-sm text-gray-700">
                         <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-3 py-1 text-emerald-700">
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                            <circle cx="12" cy="7" r="4" />
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                            <polyline points="22,6 12,13 2,6" />
                           </svg>
-                          Profile {modalTeacher.profile}
+                          {modalTeacher.email}
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-3 py-1 text-sky-700">
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                          </svg>
+                          {modalTeacher.phone}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-3 py-1 text-purple-700">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
                           </svg>
-                          School {modalTeacher.school}
+                          School #{modalTeacher.school}
                         </span>
                       </div>
                     </div>
@@ -515,12 +524,16 @@ export default function TeachersPage() {
                         <p className="text-sm font-semibold text-gray-800">#{modalTeacher.id}</p>
                       </div>
                       <div>
-                        <p className="text-xs uppercase text-gray-400">Profile ID</p>
-                        <p className="text-sm font-semibold text-gray-800">Profile {modalTeacher.profile}</p>
+                        <p className="text-xs uppercase text-gray-400">Email</p>
+                        <p className="text-sm font-semibold text-gray-800">{modalTeacher.email}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase text-gray-400">Phone</p>
+                        <p className="text-sm font-semibold text-gray-800">{modalTeacher.phone}</p>
                       </div>
                       <div>
                         <p className="text-xs uppercase text-gray-400">School ID</p>
-                        <p className="text-sm font-semibold text-gray-800">School {modalTeacher.school}</p>
+                        <p className="text-sm font-semibold text-gray-800">#{modalTeacher.school}</p>
                       </div>
                     </section>
 
