@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import React from "react";
+import React, { Suspense } from "react";
 import { getLessonById, updateLesson } from "@/lib/api/lessons";
 import { getSubjects, getTopics, SubjectRecord, TopicRecord } from "@/lib/api/subjects";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
-export default function LessonPreviewPage() {
+function LessonPreviewContent() {
   const router = useRouter();
   const params = useSearchParams();
   const lessonIdParam = params.get("id");
@@ -293,5 +293,30 @@ export default function LessonPreviewPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function LessonPreviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Lesson Details Page</h1>
+            <p className="text-sm text-gray-500">Loading...</p>
+          </div>
+          <Link href="/lessons" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+            Back to lessons
+          </Link>
+        </div>
+        <div className="mx-auto w-full max-w-4xl space-y-6">
+          <div className="rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50 p-6 text-center">
+            <div className="text-sm text-gray-600">Loading preview...</div>
+          </div>
+        </div>
+      </div>
+    }>
+      <LessonPreviewContent />
+    </Suspense>
   );
 }
