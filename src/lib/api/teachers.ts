@@ -73,3 +73,36 @@ export async function moderateTeacher(
   });
 }
 
+export interface AssignSubjectsRequest {
+  teacher_id: number;
+  subject_ids: number[];
+}
+
+export interface AssignSubjectsResponse {
+  id: number;
+  teacher_id: string;
+  profile: TeacherProfile;
+  school: number;
+  status: string;
+  moderation_comment: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function assignSubjectsToTeacher(
+  payload: AssignSubjectsRequest,
+  token: string
+): Promise<AssignSubjectsResponse> {
+  if (!token) {
+    throw new ApiClientError("Authentication token is missing", 401);
+  }
+
+  return apiRequest<AssignSubjectsResponse>("/content/teachers/assign-subjects/", {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+

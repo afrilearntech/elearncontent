@@ -4,10 +4,12 @@ import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { Icon } from "@iconify/react";
 import { getSubjects, SubjectRecord } from "@/lib/api/subjects";
 import { moderateContent, ModerateAction } from "@/lib/api/lessons";
 import SubjectsHeader from "@/components/subjects/SubjectsHeader";
 import SubjectCard, { SubjectStatus } from "@/components/subjects/SubjectCard";
+import AssignSubjectToTeacherModal from "@/components/subjects/AssignSubjectToTeacherModal";
 
 type SubjectRow = {
   id: string;
@@ -135,6 +137,7 @@ export default function SubjectsPage() {
   const [moderationFormError, setModerationFormError] = React.useState<string | null>(null);
   const [pendingModerationAction, setPendingModerationAction] = React.useState<ModerateAction | null>(null);
   const [moderationLoadingAction, setModerationLoadingAction] = React.useState<ModerateAction | null>(null);
+  const [isAssignModalOpen, setIsAssignModalOpen] = React.useState(false);
   const isModerationProcessing = moderationLoadingAction !== null;
   const isValidator = userRole === "CONTENTVALIDATOR";
   const handleCreatorStatusChange = React.useCallback(
@@ -453,13 +456,22 @@ const isValidStatusFilterValue = (value: string): value is StatusFilterOption =>
             <h1 className="text-2xl font-bold text-gray-900">Subject</h1>
             <p className="text-sm text-gray-500">Create and manage your subjects</p>
           </div>
-          <Link
-            href="/subjects/create"
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-emerald-700 transition-colors"
-          >
-            <span className="text-lg leading-none">+</span>
-            Create Subject
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => setIsAssignModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-gray-700 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-gray-800 transition-colors"
+            >
+              <Icon icon="solar:user-check-rounded-bold" className="w-5 h-5" />
+              Assign Subject to Teacher
+            </button>
+            <Link
+              href="/subjects/create"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-emerald-700 transition-colors"
+            >
+              <span className="text-lg leading-none">+</span>
+              Create Subject
+            </Link>
+          </div>
         </div>
 
         <SubjectsHeader
@@ -986,6 +998,15 @@ const isValidStatusFilterValue = (value: string): value is StatusFilterOption =>
           </div>
         </div>
       ) : null}
+
+      {/* Assign Subject to Teacher Modal */}
+      <AssignSubjectToTeacherModal
+        isOpen={isAssignModalOpen}
+        onClose={() => setIsAssignModalOpen(false)}
+        onSuccess={() => {
+          // Optionally refresh subjects if needed
+        }}
+      />
     </div>
   );
 }
